@@ -1428,6 +1428,7 @@ function iconFor(type) {
 }
 
 function redrawMarkers() {
+  if (!LAYER_GROUP) return; // الخريطة لم تُحمَّل بعد أو تعذّر تحميلها
   LAYER_GROUP.clearLayers();
   if (!STATE.municipality) return; // رئيس البلدية لا يشاهد علامات مديرية معينة حاليًا
   const muni = currentMuniState();
@@ -1622,16 +1623,23 @@ async function startGame() {
   document.getElementById('startScreen').classList.add('hidden');
   document.getElementById('gameScreen').classList.remove('hidden');
 
-  if (!MAP) initMap();
-  else setTimeout(() => MAP.invalidateSize(), 100);
+  try {
+    if (!MAP) initMap();
+    else setTimeout(() => MAP.invalidateSize(), 100);
+  } catch (e) {
+    console.error('تعذّرت تهيئة الخريطة (قد يكون بسبب انقطاع الاتصال بخدمة الخرائط):', e);
+    toast('تعذّر تحميل الخريطة، لكن باقي أقسام اللعبة تعمل بشكل طبيعي', 'error', '🗺️');
+  }
 
   if (STATE.municipality) {
     const m = MUNICIPALITIES.find(x => x.id === STATE.municipality);
-    setTimeout(() => focusMapOnMunicipality(m), 150);
+    setTimeout(() => { try { focusMapOnMunicipality(m); } catch (e) { console.error('تعذّر تقريب الخريطة:', e); } }, 150);
   } else if (MUNICIPALITY_BOUNDS_LAYER && MAP) {
-    MAP.removeLayer(MUNICIPALITY_BOUNDS_LAYER);
-    MUNICIPALITY_BOUNDS_LAYER = null;
-    MAP.setView(MUSCAT_CENTER, MUSCAT_ZOOM);
+    try {
+      MAP.removeLayer(MUNICIPALITY_BOUNDS_LAYER);
+      MUNICIPALITY_BOUNDS_LAYER = null;
+      MAP.setView(MUSCAT_CENTER, MUSCAT_ZOOM);
+    } catch (e) { console.error('تعذّر إعادة ضبط الخريطة:', e); }
   }
 
   updateRoleChip();
@@ -2703,16 +2711,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('startScreen').classList.remove('hidden');
     SELECTED_ROLE_ID = null;
-    SELECTED_MUNI_ID = null;
     document.getElementById('startBtn').disabled = true;
     document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
-    document.getElementById('jobStep').classList.add('hidden');
-    document.getElementById('scopeStep').classList.remove('hidden');
+
+    // إعادة فتح خطوة اختيار الوظيفة مباشرة بنفس النطاق الحالي (نفس المديرية/الفنية)، دون الرجوع لشاشة اختيار الموقع
+    if (SELECTED_SCOPE_TYPE === 'municipality' && SELECTED_MUNI_ID) {
+      selectMunicipalityScope(SELECTED_MUNI_ID);
+    } else if (SELECTED_SCOPE_TYPE === 'technical') {
+      selectTechnicalScope();
+    } else {
+      // رئيس البلدية دور مباشر بلا خطوة وظيفة، فارجعي لشاشة اختيار النطاق فقط في هذه الحالة
+      document.getElementById('jobStep').classList.add('hidden');
+      document.getElementById('scopeStep').classList.remove('hidden');
+    }
   });
 
   document.getElementById('backToScopeBtn').addEventListener('click', () => {
     SELECTED_ROLE_ID = null;
     SELECTED_MUNI_ID = null;
+    SELECTED_SCOPE_TYPE = null;
     document.getElementById('startBtn').disabled = true;
     document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('jobStep').classList.add('hidden');
