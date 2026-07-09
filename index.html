@@ -2,27 +2,154 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>بلدية المستقبل - مسقط | النسخة الواقعية</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>بلدية المستقبل - النسخة النهائية</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--navy:#0F2A3D;--gold:#C8961E;--gold-light:#E0B84A;--green:#2D6A4F;--red:#B23A2E;--cream:#F5F0E6}
+:root{--navy:#0F2A3D;--gold:#C8961E;--green:#2D6A4F;--red:#B23A2E;--cream:#F5F0E6;--cream-dark:#E8DFC9}
 *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',sans-serif;height:100vh;overflow:hidden;background:var(--cream)}
 #game{display:flex;flex-direction:column;height:100vh}
-.top{height:58px;background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 14px;gap:10px;border-bottom:2px solid var(--gold);flex-shrink:0}
-.top b{font-size:15px}.stats{margin-right:auto;display:flex;gap:6px}.st{background:rgba(255,255,255,.12);padding:4px 10px;border-radius:8px;font-size:12px}.st b{color:var(--gold-light)}
-.wrap{flex:1;display:flex;overflow:hidden;position:relative}
-#map{flex:1;background:#ddd}
-.side{width:340px;background:#fff;border-right:2px solid #E8DFC9;display:flex;flex-direction:column;flex-shrink:0;z-index:5}
-.side-head{padding:12px;background:var(--cream);border-bottom:1px solid #E8DFC9;font-weight:800;color:var(--navy);font-size:13px;text-align:center}
+.top{height:60px;background:var(--navy);color:#fff;display:flex;align-items:center;padding:0 14px;gap:10px;border-bottom:3px solid var(--gold);flex-shrink:0}
+.stats{margin-right:auto;display:flex;gap:6px}.st{background:rgba(255,255,255,.12);padding:6px 10px;border-radius:9px;font-size:12px;border:1px solid rgba(255,255,255,.1)}.st b{color:#E0B84A}
+.wrap{flex:1;display:flex;overflow:hidden;position:relative}#map{flex:1}
+.side{width:360px;background:#fff;border-right:2px solid var(--cream-dark);display:flex;flex-direction:column;z-index:5}
+.side-head{padding:12px;background:var(--cream);border-bottom:1px solid var(--cream-dark);font-weight:800;color:var(--navy);font-size:13px;text-align:center;display:flex;justify-content:space-between;align-items:center}
 #list{flex:1;overflow-y:auto;padding:10px}
-.task{background:var(--cream);border:1px solid #E8DFC9;border-right:4px solid var(--navy);padding:10px;border-radius:10px;margin-bottom:8px}
-.task.urgent{border-right-color:var(--red);background:#fdf2f1}
-.task b{font-size:13px;color:var(--navy);display:block;margin-bottom:3px}
-.task small{font-size:11px;color:#777}
-.btn{width:100%;padding:10px;border:none;border-radius:9px;font-family:'Cairo';font-weight:800;font-size:13px;cursor:pointer;margin-top:7px;touch-action:manipulation}
-.btn-take{background:var(--navy);color:#fff}.btn-go{background:var(--green);color:#fff}
-#panel{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:92%;max-width:400px;background:#fff;border-radius:18px;padding:16px;box-shadow:0 15px 40px rgba(0,0,0,.35);z-index:1000;display:none;border:2px solid var(--gold)}
-#panel.show{display:block;animation:pop .28s ease}
-@keyframes pop{from{transform:translateX(-50%) translateY(20px) scale(.92);opacity:0}to{transform:translateX(-50%) translateY(0) scale(1);opacity:1}}
+.task{background:#fff;border:1px solid var(--cream-dark);border-right:4px solid var(--navy);padding:11px;border-radius:10px;margin-bottom:9px;box-shadow:0 2px 6px rgba(0,0,0,.04)}
+.task.urgent{border-right-color:var(--red);background:#fff5f4}.task b{font-size:13px;color:var(--navy);display:block}.task small{font-size:11px;color:#777;display:block;margin:4px 0}
+.btn{width:100%;padding:10px;border:none;border-radius:9px;font-family:'Cairo';font-weight:800;font-size:13px;cursor:pointer;margin-top:7px}
+.btn-take{background:var(--navy);color:#fff}.btn-go{background:linear-gradient(135deg,#2D6A4F,#3a8a64);color:#fff}
+.badge{padding:2px 8px;border-radius:12px;font-size:10px;font-weight:800;display:inline-block}.urg{background:#fdeceb;color:var(--red)}.norm{background:#eef4f0;color:var(--green)}
+#panel{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);width:94%;max-width:420px;background:#fff;border-radius:18px;padding:16px;box-shadow:0 18px 45px rgba(0,0,0,.35);z-index:1000;display:none;border:2px solid var(--gold)}#panel.show{display:block;animation:pop .3s}
+@keyframes pop{from{transform:translateX(-50%) translateY(15px) scale(.95);opacity:0}to{transform:translateX(-50%) translateY(0) scale(1);opacity:1}}
+#toasts{position:fixed;top:72px;left:12px;z-index:2000;display:flex;flex-direction:column;gap:7px;pointer-events:none}.toast{background:var(--navy);color:#fff;padding:11px 14px;border-radius:10px;font-size:12px;font-weight:700;border-right:4px solid var(--gold);box-shadow:0 6px 18px rgba(0,0,0,.25);min-width:220px}
+#endScreen{position:fixed;inset:0;background:rgba(8,26,38,.92);backdrop-filter:blur(6px);z-index:3000;display:none;align-items:center;justify-content:center;padding:20px}#endScreen.show{display:flex}
+.end-card{background:#fff;border-radius:18px;padding:24px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.4);border-top:5px solid var(--gold)}
+.progress{height:8px;background:#eee;border-radius:10px;overflow:hidden;margin:10px 0}.bar{height:100%;background:linear-gradient(90deg,var(--gold),#E0B84A);transition:.5s}
+@media(max-width:800px){.side{position:absolute;inset:auto 0 0 0;height:46%;border-right:none;border-top:2px solid var(--cream-dark);display:none}.side.open{display:flex}#panel{bottom:48%}}
+</style>
+</head>
+<body>
+<div id="game">
+<div class="top">
+<b>🏛️ بلدية مسقط</b><span style="background:rgba(200,150,30,.18);border:1px solid #C8961E;color:#E0B84A;padding:4px 10px;border-radius:20px;font-size:11px">النسخة النهائية</span>
+<div class="stats"><div class="st">💰 <b id="money">50,000</b></div><div class="st">⭐ <b id="rep">75%</b></div><div class="st">🏆 <b id="done">0</b>/10</div></div>
+<button onclick="document.querySelector('.side').classList.toggle('open')" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);color:#fff;width:36px;height:36px;border-radius:9px">☰</button>
+</div>
+<div class="wrap">
+<div id="map"></div>
+<div class="side open">
+<div class="side-head"><span>المهام النشطة</span><span id="lateWarn" style="font-size:10px;color:#B23A2E;display:none">⏰ تأخير يخفض السمعة</span></div>
+<div class="progress"><div id="progBar" class="bar" style="width:0%"></div></div>
+<div id="list"></div>
+<div style="padding:10px;border-top:1px solid #eee;display:flex;gap:6px"><button class="btn" style="background:#fff;border:1px solid #ddd;font-size:11px" onclick="resetGame()">🔄 إعادة</button><button class="btn" style="background:var(--cream);border:1px solid var(--cream-dark);font-size:11px" onclick="window.print()">🖨️ تقرير</button></div>
+</div>
+<div id="panel"></div>
+</div>
+</div>
+
+<div id="endScreen"><div class="end-card"><div id="endIcon" style="font-size:48px">🏆</div><h2 id="endTitle" style="color:var(--navy);margin:10px 0">أحسنت!</h2><p id="endMsg" style="font-size:13px;color:#666;line-height:1.8"></p><div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-take" onclick="resetGame()">العب مرة أخرى</button><button class="btn" style="background:var(--cream)" onclick="document.getElementById('endScreen').classList.remove('show')">متابعة</button></div></div></div>
+<div id="toasts"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let money=50000,rep=75,doneCount=0,tasks=[],map,gameOver=false;
+const AREAS=[
+{n:"السيب",lat:23.667,lng:58.182,iss:"تجمع مياه أمطار - الطريق مسدود",price:9000,pri:"عاجل",col:"#B23A2E"},
+{n:"بوشر",lat:23.563,lng:58.383,iss:"رصيف مشاة مكسر",price:3200,pri:"عادي",col:"#1C4058"},
+{n:"الخوير",lat:23.59,lng:58.42,iss:"ازدحام بسبب حفريات عشوائية",price:7500,pri:"عاجل",col:"#2D6A4F"},
+{n:"القرم",lat:23.62,lng:58.48,iss:"صيانة حديقة القرم الطبيعية",price:4500,pri:"عادي",col:"#0F2A3D"},
+{n:"روي",lat:23.587,lng:58.545,iss:"حفرة خطيرة تهدد السيارات",price:8000,pri:"عاجل",col:"#8e0000"},
+{n:"مطرح",lat:23.613,lng:58.565,iss:"تنظيم سوق مطرح السياحي",price:8500,pri:"عاجل",col:"#8e5a00"}
+];
+
+function init(){
+let saved=localStorage.getItem('baladiya_final');
+if(saved){try{let s=JSON.parse(saved);money=s.money;rep=s.rep;doneCount=s.doneCount;tasks=s.tasks||[];}catch(e){}}
+map=L.map('map',{zoomControl:false}).setView([23.60,58.38],11.2);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+L.control.zoom({position:'topleft'}).addTo(map);
+AREAS.forEach(a=>{
+let html=`<div style="background:${a.col};color:#fff;border:2px solid #fff;outline:2px solid ${a.col};padding:7px 14px;border-radius:22px;font-weight:900;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.4);white-space:nowrap">📍 ${a.n}</div>`;
+let ic=L.divIcon({html:html,className:'',iconSize:[85,36],iconAnchor:[42,18]});
+L.marker([a.lat,a.lng],{icon:ic}).addTo(map).on('click',()=>openPanel(a));
+});
+upd();render();
+toast('مرحبا رئيس البلدية! مسقط بانتظار قراراتك');
+setInterval(checkLate,5000);
+setInterval(randomEvent,26000);
+}
+
+function openPanel(a){
+if(gameOver) return;
+let p=document.getElementById('panel');
+p.innerHTML=`
+<div style="display:flex;justify-content:space-between;align-items:flex-start">
+<div style="flex:1"><div style="display:flex;gap:6px;align-items:center"><b style="color:var(--navy);font-size:16px">📍 ${a.n}</b><span class="badge ${a.pri=='عاجل'?'urg':'norm'}">${a.pri}</span></div>
+<div style="font-size:13px;color:#222;margin-top:6px"><b>${a.iss}</b></div>
+<div style="font-size:12px;color:#666;margin-top:4px">💰 <b>${a.price.toLocaleString()} ر.ع</b> • ⭐ +${a.pri=='عاجل'?5:3} سمعة • ⏱️ لا تتأخر</div></div>
+<span onclick="panel.classList.remove('show')" style="cursor:pointer;background:#f3efe6;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%">✕</span>
+</div>
+<button class="btn btn-take" style="padding:13px;margin-top:12px;font-size:14px" onclick="takeTask('${a.n}','${a.iss}',${a.price},'${a.pri}')">✅ استلام المهمة</button>`;
+p.classList.add('show');
+}
+
+function takeTask(n,iss,price,pri){
+if(tasks.length>=5){toast('⚠️ 5 مهام كحد أقصى');return}
+tasks.push({id:Date.now(),n,iss,price,pri,t:Date.now()});
+render();save();document.getElementById('panel').classList.remove('show');toast('📋 استلمت: '+iss);
+}
+
+function render(){
+document.getElementById('count').innerText=tasks.length;
+let late=tasks.some(x=>Date.now()-x.t>20000);
+document.getElementById('lateWarn').style.display=late?'block':'none';
+let el=document.getElementById('list');
+if(!tasks.length){el.innerHTML='<div style="text-align:center;color:#999;padding:30px 10px;font-size:12px;line-height:1.9">🗺️ اضغط على أي دبوس في الخريطة<br>كل مهمة لها وقت، التأخير يخفض السمعة</div>';return}
+el.innerHTML='';tasks.forEach(t=>{
+let isLate=Date.now()-t.t>20000;
+el.innerHTML+=`<div class="task ${t.pri=='عاجل'?'urgent':''}"><b>${t.iss} ${isLate?'⏰':''}</b><small>📍 ${t.n} • <span class="badge ${t.pri=='عاجل'?'urg':'norm'}">${t.pri}</span> • 💰 ${t.price.toLocaleString()} ${isLate?'<span style="color:#B23A2E">• متأخرة!</span>':''}</small><button class="btn btn-go" onclick="finishTask(${t.id})">🚜 إرسال الفريق</button></div>`;
+});
+}
+
+function finishTask(id){
+let t=tasks.find(x=>x.id==id);let a=AREAS.find(x=>x.n==t.n);
+let fx=L.marker([a.lat,a.lng],{icon:L.divIcon({html:`<div style="background:#0F2A3D;color:#fff;padding:8px 14px;border-radius:22px;border:2px solid #C8961E;font-weight:800;font-size:12px">🚜👷 جاري التنفيذ...</div>`,className:'',iconSize:[150,36]})}).addTo(map);
+setTimeout(()=>{
+map.removeLayer(fx);
+tasks=tasks.filter(x=>x.id!=id);
+money+=t.price;rep=Math.min(100,rep+(t.pri=='عاجل'?5:3));doneCount++;
+upd();render();save();toast(`🎉 أنجزت ${t.n} +${t.price}`);
+if(doneCount>=10){win()}else if(rep<=0){lose()}
+},1200);
+}
+
+function checkLate(){
+let changed=false;
+tasks.forEach(t=>{if(Date.now()-t.t>25000 && !t.warned){rep=Math.max(0,rep-3);t.warned=true;changed=true;toast(`⚠️ تأخرت في ${t.n}! -3% سمعة`);}});
+if(changed){upd();save();render();if(rep<=0) lose();}
+}
+
+function randomEvent(){
+if(gameOver) return;
+let evs=[{m:"⛈️ تنبيه: أمطار غزيرة في السيب! بلاغ جديد",d:-5},{m:"📢 شكوى جديدة في الخوير - المواطنون غاضبون",d:-3},{m:"🎉 فعالية سياحية ناجحة في مطرح +5% سمعة",d:5},{m:"🏗️ وزارة الإسكان تشيد بعملكم +3% سمعة",d:3}];
+if(Math.random()>0.5){let e=evs[Math.floor(Math.random()*evs.length)];rep=Math.min(100,Math.max(0,rep+e.d));upd();toast(e.m);save();if(rep<=0) lose();}
+}
+
+function upd(){
+document.getElementById('money').innerText=money.toLocaleString();
+document.getElementById('rep').innerText=rep+'%';
+document.getElementById('done').innerText=doneCount;
+document.getElementById('progBar').style.width=(doneCount/10*100)+'%';
+}
+function win(){gameOver=true;document.getElementById('endIcon').innerText='🏆';document.getElementById('endTitle').innerText='فزت! مسقط فخورة بك';document.getElementById('endMsg').innerHTML=`أنجزت <b>${doneCount}</b> مهام<br>الميزانية: <b>${money.toLocaleString()} ر.ع</b><br>السمعة: <b>${rep}%</b><br><br>تقريرك جاهز للطباعة.`;document.getElementById('endScreen').classList.add('show');}
+function lose(){gameOver=true;document.getElementById('endIcon').innerText='💥';document.getElementById('endTitle').innerText='انتهت المهلة';document.getElementById('endMsg').innerHTML=`رضا المواطنين وصل 0%<br>المواطنون غير راضين عن التأخير<br>حاول مرة أخرى بتركيز على المهام العاجلة.`;document.getElementById('endScreen').classList.add('show');}
+function save(){localStorage.setItem('baladiya_final',JSON.stringify({money,rep,doneCount,tasks}));}
+function resetGame(){localStorage.removeItem('baladiya_final');location.reload();}
+function toast(m){let w=document.getElementById('toasts');let d=document.createElement('div');d.className='toast';d.innerText=m;w.appendChild(d);setTimeout(()=>d.remove(),3500);}
+
+init();
+</script>
+</body>
+</html>
