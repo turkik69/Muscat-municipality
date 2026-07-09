@@ -827,6 +827,7 @@ function freshState() {
     chairmanTasks: [],          // مهام رئيس البلدية (مستقلة عن المديريات)
     municipalities,             // بيانات كل مديرية مستقلة بالكامل
     technical: freshTechnicalState(), // بيانات المديرية العامة للشؤون الفنية
+    performance: {},             // تقييمات سرعة الإنجاز لكل دور: "muniId:roleId" أو "global:roleId" -> { totalStars, count, records }
   };
 }
 
@@ -842,6 +843,7 @@ async function loadState() {
       // دمج آمن لبيانات المديريات: أي مديرية جديدة أُضيفت للعبة لاحقًا تُهيّأ تلقائيًا
       STATE.municipalities = Object.assign({}, fresh.municipalities, saved.municipalities || {});
       STATE.technical = Object.assign(fresh.technical, saved.technical || {});
+      STATE.performance = Object.assign({}, fresh.performance, saved.performance || {});
     }
   } catch (e) {}
 }
@@ -1039,6 +1041,87 @@ function uid(prefix) {
   return prefix + '_' + Math.random().toString(36).slice(2, 9);
 }
 
+/* ==========================================================
+   نظام تقييم سرعة الإنجاز (نجوم الأداء)
+   يُطبَّق على أي إجراء له وقت إسناد/ظهور (item.time) ووقت إنجاز فعلي.
+   ========================================================== */
+
+/* عتبات الزمن بالدقائق لكل فئة إجراء: سريع (3 نجوم) | متوسط (نجمتان) | متأخر (نجمة واحدة) */
+const PERFORMANCE_THRESHOLDS = {
+  field_execution: { fast: 2, medium: 6 },   // تنفيذ ميداني: بناء/زراعة/رصف/رصد مخالفة/حل شكوى
+  decision: { fast: 1, medium: 3 },          // قرار إداري: اعتماد ترخيص/مخالفة/توجيه شكوى/تصعيد/توزيع معاملة
+};
+
+function computePerformanceRating(startTime, categoryKey) {
+  const thresholds = PERFORMANCE_THRESHOLDS[categoryKey] || PERFORMANCE_THRESHOLDS.decision;
+  const elapsedMs = Date.now() - startTime;
+  const elapsedMin = elapsedMs / 60000;
+
+  let stars, label, note;
+  if (elapsedMin <= thresholds.fast) {
+    stars = 3; label = 'سريع'; note = null;
+  } else if (elapsedMin <= thresholds.medium) {
+    stars = 2; label = 'متوسط'; note = 'يمكن تحسين زمن الاستجابة قليلًا.';
+  } else {
+    stars = 1; label = 'متأخر';
+    note = 'زمن الاستجابة أبطأ من المتوقع — يُفضّل معالجة المهام بمجرد إسنادها.';
+  }
+  return { stars, label, note, elapsedMin: Math.round(elapsedMin * 10) / 10 };
+}
+
+/* إضافة تقييم الأداء لسجل موظف/دور معيّن ضمن مديرية (أو رئيس البلدية/المديرية الفنية) */
+function performanceKeyFor(role, muniId) {
+  // رئيس البلدية دائمًا يُجمَّع أداؤه في نطاق عام واحد، بغض النظر عن مديرية القرار المتعلق به
+  if (role.id === 'chairman') return 'global:chairman';
+  return muniId ? `${muniId}:${role.id}` : `global:${role.id}`;
+}
+
+function recordPerformance(role, muniId, rating, actionLabel) {
+  if (!STATE.performance) STATE.performance = {};
+  const key = performanceKeyFor(role, muniId);
+  if (!STATE.performance[key]) {
+    STATE.performance[key] = { roleId: role.id, roleName: role.name, totalStars: 0, count: 0, records: [] };
+  }
+  const entry = STATE.performance[key];
+  entry.totalStars += rating.stars;
+  entry.count += 1;
+  entry.records.unshift({
+    actionLabel, stars: rating.stars, label: rating.label, note: rating.note,
+    elapsedMin: rating.elapsedMin, time: Date.now(),
+  });
+  entry.records = entry.records.slice(0, 30);
+}
+
+function performanceAverageStars(role, muniId) {
+  if (!STATE.performance) return null;
+  const key = performanceKeyFor(role, muniId);
+  const entry = STATE.performance[key];
+  if (!entry || entry.count === 0) return null;
+  return Math.round((entry.totalStars / entry.count) * 10) / 10;
+}
+
+function starsHtml(stars) {
+  const full = '⭐'.repeat(stars);
+  const empty = '☆'.repeat(3 - stars);
+  return full + empty;
+}
+
+/* تُستدعى بعد إتمام أي إجراء (تنفيذ ميداني أو قرار) لتسجيل تقييم الأداء وعرض ملاحظة إذا لزم */
+function applyPerformanceRating(role, muniId, startTime, categoryKey, actionLabel) {
+  const rating = computePerformanceRating(startTime, categoryKey);
+  recordPerformance(role, muniId, rating, actionLabel);
+
+  const starsText = starsHtml(rating.stars);
+  if (rating.stars === 3) {
+    toast(`${starsText} إنجاز سريع (${actionLabel})`, 'success', '🌟');
+  } else if (rating.stars === 2) {
+    toast(`${starsText} إنجاز متوسط السرعة (${actionLabel})`, 'info', '⏱️');
+  } else {
+    toast(`${starsText} إنجاز متأخر — ${rating.note}`, 'error', '⚠️');
+  }
+  return rating;
+}
+
 /* ---------- تسجيل حدث في السجل ---------- */
 /* سجل عام لرئيس البلدية (أحداث عابرة للمديريات: تمويل، اعتماد نهائي على مستوى المحافظة) */
 function pushChairmanLog(icon, text) {
@@ -1162,20 +1245,20 @@ const TECHNICAL_ROLE_IDS = TECHNICAL_ROLES.map(r => r.id);
 function ensureTasksForRole(roleId) {
   if (roleId === 'chairman') {
     if (!STATE.chairmanTasks) {
-      STATE.chairmanTasks = taskTemplatesFor(roleId).map(t => ({ ...t, done: false }));
+      STATE.chairmanTasks = taskTemplatesFor(roleId).map(t => ({ ...t, done: false, assignedAt: Date.now() }));
     }
     return;
   }
   if (TECHNICAL_ROLE_IDS.includes(roleId)) {
     if (!STATE.technical.tasks[roleId]) {
-      STATE.technical.tasks[roleId] = taskTemplatesFor(roleId).map(t => ({ ...t, done: false }));
+      STATE.technical.tasks[roleId] = taskTemplatesFor(roleId).map(t => ({ ...t, done: false, assignedAt: Date.now() }));
     }
     return;
   }
   const muni = currentMuniState();
   if (!muni) return;
   if (!muni.tasks[roleId]) {
-    muni.tasks[roleId] = taskTemplatesFor(roleId).map(t => ({ ...t, done: false }));
+    muni.tasks[roleId] = taskTemplatesFor(roleId).map(t => ({ ...t, done: false, assignedAt: Date.now() }));
   }
 }
 
@@ -1341,9 +1424,13 @@ function placeAtLocation(lat, lng) {
       applyBuildEffects(p.btype);
       project.status = 'completed';
       project.district = district;
+      const assignedTask = currentRoleTasks().find(x => x.id === p.taskId);
       completeTask(p.taskId);
       toast(`تم تنفيذ: ${MARKER_STYLES[p.btype].label} في ${district} (من مشروع مموَّل)`, 'success', MARKER_STYLES[p.btype].emoji);
       pushLog(MARKER_STYLES[p.btype].emoji, `${currentRole().name} نفّذ ${MARKER_STYLES[p.btype].label} في ${district} ضمن مشروع مموَّل من رئاسة البلدية`);
+      if (assignedTask) {
+        applyPerformanceRating(currentRole(), STATE.municipality, assignedTask.assignedAt || assignedTask.time || Date.now(), 'field_execution', MARKER_STYLES[p.btype].label);
+      }
       saveAndRerender();
     });
     return;
@@ -1364,9 +1451,13 @@ function placeAtLocation(lat, lng) {
       };
       muni.violations.push(v);
       createMarker('violation', lat, lng, district, { violationId: v.id, vtype: p.vtype });
+      const assignedTask = currentRoleTasks().find(x => x.id === p.taskId);
       completeTask(p.taskId);
       toast(`تم رصد مخالفة: ${VIOLATION_LABELS[p.vtype]}`, 'error', '⚠️');
       pushLog('⚠️', `${currentRole().name} رصد مخالفة (${VIOLATION_LABELS[p.vtype]}) في ${district} — أُحيلت إلى مدير الدائرة`);
+      if (assignedTask) {
+        applyPerformanceRating(currentRole(), STATE.municipality, assignedTask.assignedAt || assignedTask.time || Date.now(), 'field_execution', `رصد ${VIOLATION_LABELS[p.vtype]}`);
+      }
       saveAndRerender();
     });
     return;
@@ -1810,12 +1901,14 @@ function renderTasksPane() {
   const role = currentRole();
   const tasks = currentRoleTasks();
 
+  pane.innerHTML = renderPerformanceSummary(role);
+
   if (tasks.length === 0) {
-    pane.innerHTML = `<div class="empty-state">لا توجد مهام محددة لهذا الدور حاليًا.</div>`;
+    pane.innerHTML += `<div class="empty-state">لا توجد مهام محددة لهذا الدور حاليًا.</div>`;
     return;
   }
 
-  pane.innerHTML = `<div class="section-title"><span class="dot"></span>مهام ${role.name}</div>`;
+  pane.innerHTML += `<div class="section-title"><span class="dot"></span>مهام ${role.name}</div>`;
 
   // إذا كان الدور مدير دائرة، اعرض المهام مجمّعة حسب الدائرة المتخصصة
   if (role.id === 'director') {
@@ -1838,6 +1931,40 @@ function renderTasksPane() {
   }
 
   tasks.forEach(t => pane.appendChild(buildTaskCard(t)));
+}
+
+/* ---------- ملخص أداء الدور الحالي (متوسط النجوم + آخر الملاحظات) ---------- */
+function renderPerformanceSummary(role) {
+  const muniId = STATE.municipality;
+  const avg = performanceAverageStars(role, muniId);
+  if (avg === null) return ''; // لا يوجد سجل أداء بعد لهذا الدور
+
+  const key = performanceKeyFor(role, muniId);
+  const entry = STATE.performance[key];
+  const recentNotes = entry.records.filter(r => r.note).slice(0, 3);
+
+  let html = `
+    <div class="section-title"><span class="dot"></span>تقييم أداء ${role.name}</div>
+    <div class="empty-state" style="padding:12px; text-align:right; line-height:1.9;">
+      <div style="font-size:20px; letter-spacing:2px;">${starsHtml(Math.round(avg))}</div>
+      <div style="font-size:12px; color:#8a8478; margin-top:4px;">متوسط ${avg} من 3 · بناءً على ${entry.count} إجراء</div>
+    </div>
+  `;
+
+  if (recentNotes.length > 0) {
+    html += `<div class="section-title"><span class="dot"></span>ملاحظات تحتاج انتباهك</div>`;
+    recentNotes.forEach(r => {
+      html += `
+        <div class="task-card" style="cursor:default; border-right-color:var(--red);">
+          <div class="tc-title">${starsHtml(r.stars)} ${r.actionLabel}</div>
+          <div class="tc-meta"><span>استغرقت ${r.elapsedMin} دقيقة</span></div>
+          <div style="font-size:11.5px; color:var(--red); margin-top:4px;">${r.note}</div>
+        </div>
+      `;
+    });
+  }
+
+  return html;
 }
 
 function buildTaskCard(t) {
@@ -1887,6 +2014,7 @@ function openTask(t) {
     playSound('directive');
     toast('تم إصدار التوجيه بنجاح', 'success', '📢');
     pushLog('📢', `${currentRole().name} أصدر توجيهًا: ${t.title}`);
+    applyPerformanceRating(currentRole(), STATE.municipality, t.assignedAt || Date.now(), 'decision', t.title);
     saveAndRerender();
   } else if (t.kind === 'fund_project') {
     openFundPanel(t);
@@ -1955,6 +2083,7 @@ function confirmFundProject() {
   toast(`تم اعتماد تمويل ${pt.name} بمبلغ ${cost.toLocaleString('ar-OM')} ر.ع لـ ${muniDef.name}`, 'success', pt.icon);
   pushLog(pt.icon, `رئيس البلدية وجّه تمويلًا بقيمة ${cost.toLocaleString('ar-OM')} ر.ع لـ ${pt.name} في ${muniDef.name} — بانتظار التنفيذ الميداني`, muniId);
   pushChairmanLog(pt.icon, `تم توجيه تمويل بقيمة ${cost.toLocaleString('ar-OM')} ر.ع لـ ${pt.name} في ${muniDef.name}`);
+  applyPerformanceRating(currentRole(), null, t.assignedAt || Date.now(), 'decision', `توجيه تمويل ${pt.name}`);
 
   document.getElementById('fundPanel').classList.remove('show');
   FUND_TASK_CTX = null;
@@ -2209,12 +2338,15 @@ function handleApplicationAction(act, id, domain) {
   const tech = STATE.technical;
   const a = tech.applications.find(x => x.id === id);
   if (!a) return;
+  const stageStart = a.lastStageTime || a.time;
 
   if (act === 'distribute') {
     a.stage = 'distributed';
     playSound('directive');
     toast('تم توزيع المعاملة على المهندسين المختصين', 'info', '📤');
     pushTechnicalLog('📤', `${role.name} وزّع معاملة (${a.projectType}) من ${a.office} على المهندسين المختصين`);
+    applyPerformanceRating(role, null, stageStart, 'decision', `توزيع معاملة (${a.projectType})`);
+    a.lastStageTime = Date.now();
   } else if (act === 'review_approve' || act === 'review_reject') {
     a.reviews[domain].done = true;
     a.reviews[domain].approved = act === 'review_approve';
@@ -2222,17 +2354,20 @@ function handleApplicationAction(act, id, domain) {
     playSound(act === 'review_approve' ? 'license_approve' : 'license_reject');
     toast(act === 'review_approve' ? `تم اعتماد ${domainInfo.name}` : `تم طلب تعديل على ${domainInfo.name}`, act === 'review_approve' ? 'success' : 'error', domainInfo.icon);
     pushTechnicalLog(domainInfo.icon, `${role.name} ${act === 'review_approve' ? 'اعتمد' : 'طلب تعديلًا على'} ${domainInfo.name} لمعاملة (${a.projectType})`);
+    applyPerformanceRating(role, null, stageStart, 'decision', `${domainInfo.name} لمعاملة (${a.projectType})`);
 
     const allDone = REVIEW_DOMAINS.every(d => a.reviews[d.id].done);
     if (allDone) {
       const allApproved = REVIEW_DOMAINS.every(d => a.reviews[d.id].approved);
       if (allApproved) {
         a.stage = 'final_review';
+        a.lastStageTime = Date.now();
         pushTechnicalLog('📋', `اكتمل تدقيق كل المهندسين على معاملة (${a.projectType}) — بانتظار الاعتماد النهائي من المدير العام`);
       } else {
         // إذا أحد المهندسين طلب تعديل، تعود المعاملة لمرحلة التوزيع لإعادة النظر (تبسيطًا: تُصفّر المراجعات)
         REVIEW_DOMAINS.forEach(d => { a.reviews[d.id] = { done: false, approved: false }; });
         a.stage = 'received';
+        a.lastStageTime = Date.now();
         toast('طُلب تعديل — أُعيدت المعاملة لمدير دائرة التراخيص لإعادة التوزيع بعد التصحيح', 'error', '🔁');
         pushTechnicalLog('🔁', `أُعيدت معاملة (${a.projectType}) لإعادة التدقيق بعد طلب تعديل`);
       }
@@ -2242,6 +2377,7 @@ function handleApplicationAction(act, id, domain) {
     playSound('license_approve');
     toast(`تم الاعتماد النهائي وإحالة المعاملة إلى ${a.office}`, 'success', '✅');
     pushTechnicalLog('✅', `${role.name} اعتمد نهائيًا معاملة (${a.projectType}) وأحالها إلى ${a.office}`);
+    applyPerformanceRating(role, null, stageStart, 'decision', `اعتماد نهائي لمعاملة (${a.projectType})`);
   }
 
   saveAndRerender();
@@ -2259,6 +2395,7 @@ function handleComplaintAction(act, id, muniId) {
   const c = muni.complaints.find(x => x.id === id);
   if (!c) return;
   const ct = COMPLAINT_TYPES[c.type];
+  const stageStart = c.lastStageTime || c.time;
 
   if (act === 'forward') {
     c.stage += 1;
@@ -2266,12 +2403,16 @@ function handleComplaintAction(act, id, muniId) {
     playSound('directive');
     toast(`تم توجيه الشكوى إلى ${nextRoleName}`, 'info', '📤');
     pushLog('📤', `${role.name} وجّه شكوى (${ct.label}) في ${c.district} إلى ${nextRoleName}`, muniId);
+    applyPerformanceRating(role, muniId, stageStart, 'decision', `توجيه شكوى (${ct.label})`);
+    c.lastStageTime = Date.now();
   } else if (act === 'escalate') {
     c.stage = 4; // مصعّدة لرئيس البلدية
     playSound('directive');
     toast('تم تصعيد الشكوى لرئيس البلدية', 'info', '📤');
     pushLog('📤', `${role.name} صعّد شكوى (${ct.label}) في ${c.district} لرئيس البلدية لتعذر حلها بالمديرية`, muniId);
     pushChairmanLog('📤', `شكوى مُصعّدة (${ct.label}) من ${MUNICIPALITIES.find(m => m.id === muniId).name}`);
+    applyPerformanceRating(role, muniId, stageStart, 'decision', `تصعيد شكوى (${ct.label})`);
+    c.lastStageTime = Date.now();
   } else if (act === 'resolve') {
     // الموظف المختص ينفذ الحل مباشرة على الخريطة بحركة وصوت مناسبين لنوع الشكوى
     const fxType = c.type === 'road_repair' ? 'road' : 'waste_point';
@@ -2282,6 +2423,7 @@ function handleComplaintAction(act, id, muniId) {
       playSound('license_approve');
       toast(`تم تنفيذ حل الشكوى (${ct.label}) بنجاح`, 'success', '✅');
       pushLog('✅', `${role.name} نفّذ حل شكوى (${ct.label}) في ${c.district}`, muniId);
+      applyPerformanceRating(role, muniId, stageStart, 'field_execution', `تنفيذ حل شكوى (${ct.label})`);
       completeAnyComplaintTask(role, muniId);
       saveAndRerender();
     });
@@ -2293,6 +2435,7 @@ function handleComplaintAction(act, id, muniId) {
     toast(`تم توجيه حل مباشر للشكوى (${ct.label})`, 'success', '✅');
     pushLog('✅', `رئيس البلدية وجّه حلًا مباشرًا لشكوى (${ct.label}) في ${c.district}`, muniId);
     pushChairmanLog('✅', `تم حل شكوى مُصعّدة (${ct.label}) من ${MUNICIPALITIES.find(m => m.id === muniId).name}`);
+    applyPerformanceRating(role, null, stageStart, 'decision', `حل مباشر لشكوى (${ct.label})`);
   }
 
   completeAnyComplaintTask(role, muniId);
@@ -2434,6 +2577,7 @@ function handleReqAction(act, id, kind, muniId) {
   if (kind === 'license') {
     const r = muni.requests.find(x => x.id === id);
     if (!r) return;
+    const stageStart = r.lastStageTime || r.time;
 
     if (act === 'escalate_up') {
       r.currentLevel += 1;
@@ -2441,6 +2585,8 @@ function handleReqAction(act, id, kind, muniId) {
       playSound('directive');
       toast(`تم رفع طلب الترخيص إلى ${nextRoleName}`, 'info', '📤');
       pushLog('📤', `${role.name} رفع طلب ترخيص بناء (${r.buildingType}) في ${r.district} إلى ${nextRoleName}`, muniId);
+      applyPerformanceRating(role, muniId, stageStart, 'decision', `رفع طلب ترخيص (${r.buildingType})`);
+      r.lastStageTime = Date.now();
     } else if (act === 'approve') {
       r.status = 'approved';
       muni.stats.licensesIssued += 1;
@@ -2449,12 +2595,14 @@ function handleReqAction(act, id, kind, muniId) {
       playSound('license_approve');
       toast(`تم اعتماد ترخيص البناء (${r.buildingType})`, 'success', '✅');
       pushLog('✅', `${role.name} اعتمد نهائيًا ترخيص بناء (${r.buildingType}) في ${r.district}`, muniId);
+      applyPerformanceRating(role, muniId, stageStart, 'decision', `اعتماد ترخيص (${r.buildingType})`);
     } else if (act === 'reject') {
       r.status = 'rejected';
       muni.stats.citizenSatisfaction = clamp(muni.stats.citizenSatisfaction - 1, 0, 100);
       playSound('license_reject');
       toast(`تم رفض طلب الترخيص`, 'error', '❌');
       pushLog('❌', `${role.name} رفض طلب ترخيص بناء في ${r.district}`, muniId);
+      applyPerformanceRating(role, muniId, stageStart, 'decision', `رفض ترخيص (${r.buildingType})`);
     }
     completeAnyLicenseTask(role, muniId);
   }
@@ -2462,6 +2610,7 @@ function handleReqAction(act, id, kind, muniId) {
   if (kind === 'violation') {
     const v = muni.violations.find(x => x.id === id);
     if (!v) return;
+    const stageStart = v.lastStageTime || v.time;
 
     if (act === 'escalate_up') {
       v.currentLevel += 1;
@@ -2469,6 +2618,8 @@ function handleReqAction(act, id, kind, muniId) {
       playSound('directive');
       toast(`تم رفع المخالفة إلى ${nextRoleName}`, 'info', '📤');
       pushLog('📤', `${role.name} رفع مخالفة (${VIOLATION_LABELS[v.type]}) في ${v.district} إلى ${nextRoleName}`, muniId);
+      applyPerformanceRating(role, muniId, stageStart, 'decision', `رفع مخالفة (${VIOLATION_LABELS[v.type]})`);
+      v.lastStageTime = Date.now();
     } else if (act === 'fine') {
       v.status = 'fined';
       muni.stats.violationsHandled += 1;
@@ -2477,10 +2628,12 @@ function handleReqAction(act, id, kind, muniId) {
       playSound('fine');
       toast(`تم فرض غرامة (${v.fineAmount.toLocaleString('ar-OM')} ر.ع) ومعالجة المخالفة`, 'success', '💵');
       pushLog('💵', `${role.name} فرض غرامة ${v.fineAmount.toLocaleString('ar-OM')} ر.ع على مخالفة (${VIOLATION_LABELS[v.type]}) في ${v.district}`, muniId);
+      applyPerformanceRating(role, muniId, stageStart, 'decision', `فرض غرامة (${VIOLATION_LABELS[v.type]})`);
     } else if (act === 'dismiss') {
       v.status = 'dismissed';
       toast('تم تجاهل البلاغ', 'info', '🗂️');
       pushLog('🗂️', `${role.name} أغلق بلاغ مخالفة دون إجراء في ${v.district}`, muniId);
+      applyPerformanceRating(role, muniId, stageStart, 'decision', `إغلاق بلاغ (${VIOLATION_LABELS[v.type]})`);
     }
     completeAnyViolationTask(role, muniId);
   }
