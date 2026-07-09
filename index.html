@@ -497,16 +497,23 @@ body{
         وشاهد كيف تتحول المدينة على خريطة مسقط الحقيقية عندما يعمل الجميع بالطريقة الصحيحة.
       </p>
 
-      <div class="role-select-title">اختر دورك الوظيفي</div>
+      <!-- ===== الخطوة 1: اختيار النطاق (رئيس البلدية أو إحدى المديريات) ===== -->
+      <div id="scopeStep">
+        <div class="role-select-title">اختر نطاق عملك</div>
 
-      <div class="tier-label">القيادة العليا</div>
-      <div class="role-grid" id="roleGridTop"></div>
+        <div class="tier-label">القيادة العليا (فوق كل المديريات)</div>
+        <div class="role-grid" id="chairmanGrid"></div>
 
-      <div class="tier-label">الإدارة التنفيذية</div>
-      <div class="role-grid" id="roleGridMid"></div>
+        <div class="tier-label">المديريات الست</div>
+        <div class="role-grid" id="municipalityGrid"></div>
+      </div>
 
-      <div class="tier-label">الكوادر الهندسية والفنية</div>
-      <div class="role-grid" id="roleGridEng"></div>
+      <!-- ===== الخطوة 2: اختيار الوظيفة داخل المديرية المختارة ===== -->
+      <div id="jobStep" class="hidden">
+        <div class="role-select-title" id="jobStepTitle">اختر وظيفتك</div>
+        <div class="role-grid" id="jobGrid"></div>
+        <button class="btn-outline" id="backToScopeBtn" style="margin-top:10px; padding:9px 22px; border-radius:8px; font-family:'Cairo',sans-serif; font-weight:700; cursor:pointer;">‹ رجوع لاختيار المديرية</button>
+      </div>
 
       <button class="start-btn" id="startBtn" disabled>ابدأ العمل في البلدية</button>
     </div>
@@ -550,7 +557,11 @@ body{
           <div class="mp-title" id="fundTitle">توجيه تمويل مشروع</div>
           <div class="mp-close" id="fundClose">✕</div>
         </div>
-        <div class="mp-desc" id="fundDesc">حدد عدد الوحدات المطلوبة، وسيُخصم المبلغ المقابل من الميزانية العمومية.</div>
+        <div class="mp-desc" id="fundDesc">اختر المديرية، وحدد عدد الوحدات المطلوبة، وسيُخصم المبلغ المقابل من الميزانية العمومية.</div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:11.5px; color:#666; display:block; margin-bottom:4px;">المديرية المستفيدة</label>
+          <select id="fundMuniSelect" style="width:100%; padding:8px; border:1px solid var(--cream-dark); border-radius:8px; font-family:'Cairo',sans-serif; font-size:13px;"></select>
+        </div>
         <div style="margin-bottom:10px;">
           <label style="font-size:11.5px; color:#666; display:block; margin-bottom:4px;">عدد الوحدات</label>
           <input type="number" id="fundUnits" min="1" value="10" style="width:100%; padding:8px; border:1px solid var(--cream-dark); border-radius:8px; font-family:'Cairo',sans-serif; font-size:13px;">
@@ -592,7 +603,42 @@ body{
 const MUSCAT_CENTER = [23.6100, 58.4200];
 const MUSCAT_ZOOM = 11;
 
-/* ---------- الدوائر المتخصصة ---------- */
+/* ---------- المديريات الست في محافظة مسقط ---------- */
+/* bounds: [ [جنوب, غرب], [شمال, شرق] ] لاستخدامها في تكبير الخريطة تلقائيًا عند دخول المديرية */
+const MUNICIPALITIES = [
+  {
+    id: 'seeb', name: 'مديرية السيب', icon: '🏙️',
+    center: [23.6703, 58.1889],
+    bounds: [[23.58, 58.05], [23.75, 58.33]],
+  },
+  {
+    id: 'bawshar', name: 'مديرية بوشر', icon: '🏘️',
+    center: [23.5880, 58.3980],
+    bounds: [[23.50, 58.32], [23.63, 58.46]],
+  },
+  {
+    id: 'muttrah', name: 'مديرية مطرح', icon: '⚓',
+    center: [23.6150, 58.5920],
+    bounds: [[23.58, 58.53], [23.66, 58.63]],
+  },
+  {
+    id: 'muscat', name: 'مديرية مسقط', icon: '🏛️',
+    center: [23.6140, 58.5930],
+    bounds: [[23.57, 58.55], [23.63, 58.63]],
+  },
+  {
+    id: 'amerat', name: 'مديرية العامرات', icon: '🌄',
+    center: [23.5280, 58.4450],
+    bounds: [[23.40, 58.35], [23.58, 58.55]],
+  },
+  {
+    id: 'quriyat', name: 'مديرية قريات', icon: '🌊',
+    center: [23.2600, 58.9080],
+    bounds: [[23.05, 58.70], [23.45, 59.10]],
+  },
+];
+
+/* ---------- الدوائر المتخصصة (تتكرر داخل كل مديرية) ---------- */
 const DEPARTMENTS = [
   { id: 'staff',      name: 'دائرة الموظفين',   icon: '👥' },
   { id: 'corresp',    name: 'دائرة المخاطبات',  icon: '✉️' },
@@ -604,107 +650,84 @@ const DEPARTMENTS = [
 
 /* ---------- تعريف الأدوار ---------- */
 /* approvalLevel: 0 = بلا صلاحية اعتماد (توصية فقط) | 1 = مدير دائرة (يرفع فقط) | 2 = مدير عام (يعتمد ضمن سقف صلاحيته) | 3 = رئيس البلدية (يعتمد كل شيء) */
-const ROLES = [
-  {
-    id: 'chairman', tier: 'top', icon: '🏛️', name: 'رئيس البلدية',
-    desc: 'يضع الرؤية العامة، يعتمد الميزانية العمومية، ويبتّ في الطلبات والمشاريع الكبرى المُصعَّدة إليه',
-    approvalLevel: 3, canIssueDirectives: true, canFineViolations: false,
-    canBuildProjects: false, canAllocateBudget: true, budgetAuthority: 5,
-  },
+/* الأدوار الأربعة (مدير عام، مدير دائرة، رئيس قسم، موظف) تتكرر بنفس الشكل داخل كل مديرية من المديريات الست */
+/* رئيس البلدية دور مستقل فوق جميع المديريات، لا ينتمي لمديرية معينة */
+const MUNICIPALITY_ROLES = [
   {
     id: 'general_director', tier: 'top', icon: '🎖️', name: 'مدير عام',
-    desc: 'يشرف على جميع الدوائر، ويعتمد الطلبات المرفوعة من مديري الدوائر ضمن سقف صلاحيته، ويصعّد ما يتجاوزها لرئيس البلدية',
+    desc: 'يشرف على جميع الدوائر في المديرية، ويعتمد الطلبات المرفوعة من مدير الدائرة ضمن سقف صلاحيته، ويصعّد ما يتجاوزها لرئيس البلدية',
     approvalLevel: 2, canIssueDirectives: true, canFineViolations: false,
     canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 4,
   },
   {
     id: 'director', tier: 'mid', icon: '📋', name: 'مدير دائرة',
-    desc: 'يدير جميع الدوائر المتخصصة (الموظفين، المخاطبات، التخطيط، التراخيص، الرقابة، التنظيم) ويرفع توصياته للمدير العام لاعتمادها',
+    desc: 'يدير جميع الدوائر المتخصصة في المديرية (الموظفين، المخاطبات، التخطيط، التراخيص، الرقابة، التنظيم) ويرفع توصياته للمدير العام لاعتمادها',
     approvalLevel: 1, canIssueDirectives: true, canFineViolations: true,
     canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 3,
   },
   {
     id: 'section_head', tier: 'mid', icon: '🗂️', name: 'رئيس قسم',
-    desc: 'يتابع ويشرف على سير العمل اليومي للفريق وتنفيذ المهام اليومية',
+    desc: 'يتابع ويشرف على سير العمل اليومي للفريق وتنفيذ المهام اليومية داخل المديرية',
     approvalLevel: 0, canIssueDirectives: false, canFineViolations: true,
     canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 1,
   },
   {
-    id: 'inspector', tier: 'mid', icon: '🕵️', name: 'مفتش رقابة بلدية',
-    desc: 'يرصد المخالفات الميدانية ويصدر الإنذارات والغرامات',
+    id: 'employee', tier: 'eng', icon: '👷', name: 'موظف',
+    desc: 'ينفذ المهام الميدانية اليومية في المديرية: زراعة، رصف، صيانة، رصد ميداني، ومتابعة الطلبات',
     approvalLevel: 0, canIssueDirectives: false, canFineViolations: true,
-    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 0,
-  },
-  {
-    id: 'architect', tier: 'eng', icon: '📐', name: 'مهندس معماري',
-    desc: 'يراجع المخططات المعمارية وينفذ مشاريع الحدائق والواجهات العامة المموَّلة',
-    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
-    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0, specialty: 'park',
-  },
-  {
-    id: 'structural_engineer', tier: 'eng', icon: '🏗️', name: 'مهندس إنشائي',
-    desc: 'يراجع السلامة الإنشائية للمباني ويعتمد التراخيص فنيًا',
-    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
-    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 0, specialty: 'structural_review',
-  },
-  {
-    id: 'roads_engineer', tier: 'eng', icon: '🛣️', name: 'مهندس طرق',
-    desc: 'ينفذ مشاريع رصف الطرق وصيانتها بعد اعتماد تمويلها',
-    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
-    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0, specialty: 'road',
-  },
-  {
-    id: 'landscape_engineer', tier: 'eng', icon: '🌳', name: 'مهندس زراعي / بيئي',
-    desc: 'ينفذ مشاريع زراعة الأشجار وتشجير الأحياء بعد اعتماد تمويلها',
-    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
-    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0, specialty: 'tree',
-  },
-  {
-    id: 'waste_engineer', tier: 'eng', icon: '♻️', name: 'مهندس نظافة وبيئة',
-    desc: 'يدير مواقع النفايات ويتابع بلاغات مخلفات البناء',
-    approvalLevel: 0, canIssueDirectives: false, canFineViolations: true,
-    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0, specialty: 'waste',
+    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0,
   },
 ];
 
-const TIER_LABELS = { top: 'roleGridTop', mid: 'roleGridMid', eng: 'roleGridEng' };
+/* ---------- دور رئيس البلدية (مستقل، فوق كل المديريات) ---------- */
+const CHAIRMAN_ROLE = {
+  id: 'chairman', tier: 'top', icon: '🏛️', name: 'رئيس البلدية',
+  desc: 'يضع الرؤية العامة، يعتمد الميزانية العمومية، ويبتّ في الطلبات والمشاريع الكبرى المُصعَّدة إليه من أي مديرية',
+  approvalLevel: 3, canIssueDirectives: true, canFineViolations: false,
+  canBuildProjects: false, canAllocateBudget: true, budgetAuthority: 5,
+};
 
-/* ---------- مناطق/ولايات محافظة مسقط للأحياء السكنية ---------- */
-const DISTRICTS = [
-  { name: 'بوشر', lat: 23.5880, lng: 58.3980 },
-  { name: 'السيب', lat: 23.6703, lng: 58.1889 },
-  { name: 'مطرح', lat: 23.6150, lng: 58.5920 },
-  { name: 'العامرات', lat: 23.5280, lng: 58.4450 },
-  { name: 'قريات', lat: 23.2600, lng: 58.9080 },
-  { name: 'مسقط (القديمة)', lat: 23.6140, lng: 58.5930 },
-  { name: 'الموالح', lat: 23.5950, lng: 58.4120 },
-  { name: 'الخوض', lat: 23.5950, lng: 58.2800 },
-];
-
+/* قائمة موحّدة لكل الأدوار الممكنة (تُستخدم في البحث بالمعرف عبر النظام) */
+const ROLES = [CHAIRMAN_ROLE, ...MUNICIPALITY_ROLES];
 /* ---------- حالة اللعبة ---------- */
 const STORAGE_KEY = 'baladiya_mustaqbal_state_v1';
 
-function freshState() {
+function freshLocalStats() {
   return {
-    role: null,
-    stats: {
-      generalBudget: 500000,   // الميزانية العمومية التي يوجهها رئيس البلدية فقط
-      operatingRevenue: 0,     // إيرادات تشغيلية (رسوم تراخيص + غرامات) تصب بالميزانية العمومية
-      devPoints: 0,
-      trees: 0,
-      parks: 0,
-      roadsKm: 0,
-      licensesIssued: 0,
-      violationsHandled: 0,
-      citizenSatisfaction: 55,
-    },
+    devPoints: 0,
+    trees: 0,
+    parks: 0,
+    roadsKm: 0,
+    licensesIssued: 0,
+    violationsHandled: 0,
+    citizenSatisfaction: 55,
+  };
+}
+
+function freshMunicipalityState() {
+  return {
+    stats: freshLocalStats(),
     markers: [],
     requests: [],
     violations: [],
     projects: [],
-    tasks: {},
+    tasks: {},   // roleId -> [ {id, title, done, ...} ]
     log: [],
     seeded: false,
+  };
+}
+
+function freshState() {
+  const municipalities = {};
+  MUNICIPALITIES.forEach(m => { municipalities[m.id] = freshMunicipalityState(); });
+  return {
+    role: null,          // معرف الوظيفة الحالية (chairman أو أحد أدوار MUNICIPALITY_ROLES)
+    municipality: null,  // معرف المديرية الحالية (null إذا كان الدور رئيس البلدية)
+    generalBudget: 500000,     // الميزانية العمومية المركزية التي يوجهها رئيس البلدية فقط
+    operatingRevenue: 0,       // إجمالي الإيرادات التشغيلية من كل المديريات (رسوم + غرامات)
+    chairmanLog: [],            // سجل أحداث خاص برئيس البلدية (عابر لكل المديريات)
+    chairmanTasks: [],          // مهام رئيس البلدية (مستقلة عن المديريات)
+    municipalities,             // بيانات كل مديرية مستقلة بالكامل
   };
 }
 
@@ -714,7 +737,11 @@ async function loadState() {
   try {
     const result = await window.storage.get(STORAGE_KEY, false);
     if (result && result.value) {
-      STATE = Object.assign(freshState(), JSON.parse(result.value));
+      const saved = JSON.parse(result.value);
+      const fresh = freshState();
+      STATE = Object.assign(fresh, saved);
+      // دمج آمن لبيانات المديريات: أي مديرية جديدة أُضيفت للعبة لاحقًا تُهيّأ تلقائيًا
+      STATE.municipalities = Object.assign({}, fresh.municipalities, saved.municipalities || {});
     }
   } catch (e) {}
 }
@@ -728,6 +755,12 @@ async function saveState() {
 async function resetState() {
   try { await window.storage.delete(STORAGE_KEY, false); } catch (e) {}
   STATE = freshState();
+}
+
+/* ---------- الوصول لبيانات المديرية الحالية ---------- */
+function currentMuniState() {
+  if (!STATE.municipality) return null;
+  return STATE.municipalities[STATE.municipality];
 }
 
 /* ==========================================================
@@ -907,9 +940,21 @@ function uid(prefix) {
 }
 
 /* ---------- تسجيل حدث في السجل ---------- */
-function pushLog(icon, text) {
-  STATE.log.unshift({ icon, text, time: new Date().toLocaleTimeString('ar-OM', { hour: '2-digit', minute: '2-digit' }) });
-  STATE.log = STATE.log.slice(0, 60);
+/* سجل عام لرئيس البلدية (أحداث عابرة للمديريات: تمويل، اعتماد نهائي على مستوى المحافظة) */
+function pushChairmanLog(icon, text) {
+  if (!STATE.chairmanLog) STATE.chairmanLog = [];
+  STATE.chairmanLog.unshift({ icon, text, time: new Date().toLocaleTimeString('ar-OM', { hour: '2-digit', minute: '2-digit' }) });
+  STATE.chairmanLog = STATE.chairmanLog.slice(0, 60);
+}
+
+/* سجل خاص بمديرية معينة؛ muniId اختياري (افتراضيًا المديرية الحالية) */
+function pushLog(icon, text, muniId = null) {
+  const targetId = muniId || STATE.municipality;
+  if (!targetId) { pushChairmanLog(icon, text); return; }
+  const muni = STATE.municipalities[targetId];
+  if (!muni) return;
+  muni.log.unshift({ icon, text, time: new Date().toLocaleTimeString('ar-OM', { hour: '2-digit', minute: '2-digit' }) });
+  muni.log = muni.log.slice(0, 60);
 }
 
 /* ---------- إشعار toast ---------- */
@@ -959,29 +1004,14 @@ function taskTemplatesFor(roleId) {
       { id: 't_sh_1', title: 'متابعة سير عمل الفريق اليومي', kind: 'approve_license', desc: 'راجع الطلبات الأولية قبل تصعيدها لمدير الدائرة.' },
       { id: 't_sh_2', title: 'جدولة المهام اليومية للفريق', kind: 'handle_violation', desc: 'وزّع المهام الميدانية اليومية على الفريق.' },
     ],
-    inspector: [
-      { id: 't_ins_1', title: 'رصد مخالفة بناء بدون ترخيص', kind: 'create_violation', vtype: 'unlicensed', desc: 'اختر موقعًا على الخريطة داخل حي سكني وسجّل مخالفة بناء بدون ترخيص.' },
-      { id: 't_ins_2', title: 'رصد مخلفات بناء متروكة', kind: 'create_violation', vtype: 'debris', desc: 'اختر موقعًا وسجّل مخالفة ترك مخلفات بناء في الموقع.' },
-      { id: 't_ins_3', title: 'رصد رمي نفايات في الطريق العام', kind: 'create_violation', vtype: 'litter', desc: 'اختر موقعًا على طريق عام وسجّل مخالفة رمي مخلفات.' },
-    ],
-    architect: [
-      { id: 't_arch_1', title: 'تنفيذ مشروع حديقة عامة مموَّل', kind: 'build', btype: 'park', desc: 'نفّذ مشروع حديقة معتمد التمويل من رئاسة البلدية على الموقع المحدد.' },
-      { id: 't_arch_2', title: 'مراجعة مخطط واجهة مبنى حكومي', kind: 'approve_license', desc: 'راجع الطلبات المعمارية المعلقة.' },
-    ],
-    structural_engineer: [
-      { id: 't_str_1', title: 'مراجعة السلامة الإنشائية لطلب ترخيص', kind: 'approve_license', desc: 'تحقق من المخططات الإنشائية قبل الاعتماد.' },
-    ],
-    roads_engineer: [
-      { id: 't_road_1', title: 'تنفيذ مشروع رصف طريق مموَّل', kind: 'build', btype: 'road', desc: 'نفّذ مشروع رصف طريق معتمد التمويل على الموقع المحدد.' },
-      { id: 't_road_2', title: 'صيانة طريق متضرر', kind: 'build', btype: 'road', desc: 'نفّذ مشروع صيانة طريق معتمد التمويل.' },
-    ],
-    landscape_engineer: [
-      { id: 't_tree_1', title: 'تنفيذ مشروع تشجير مموَّل', kind: 'build', btype: 'tree', desc: 'نفّذ مشروع تشجير معتمد التمويل على الموقع المحدد.' },
-      { id: 't_tree_2', title: 'تشجير حي سكني', kind: 'build', btype: 'tree', desc: 'نفّذ مشروع تشجير إضافي معتمد التمويل.' },
-    ],
-    waste_engineer: [
-      { id: 't_waste_1', title: 'متابعة بلاغ مخلفات بناء', kind: 'handle_violation', desc: 'راجع بلاغات مخلفات البناء المرصودة واتخذ إجراء.' },
-      { id: 't_waste_2', title: 'تنفيذ مشروع نقطة تجميع نفايات', kind: 'build', btype: 'waste_point', desc: 'نفّذ مشروع نقطة تجميع نفايات معتمد التمويل.' },
+    employee: [
+      { id: 't_emp_1', title: 'رصد مخالفة بناء بدون ترخيص', kind: 'create_violation', vtype: 'unlicensed', desc: 'اختر موقعًا على الخريطة داخل حي سكني وسجّل مخالفة بناء بدون ترخيص.' },
+      { id: 't_emp_2', title: 'رصد مخلفات بناء متروكة', kind: 'create_violation', vtype: 'debris', desc: 'اختر موقعًا وسجّل مخالفة ترك مخلفات بناء في الموقع.' },
+      { id: 't_emp_3', title: 'رصد رمي نفايات في الطريق العام', kind: 'create_violation', vtype: 'litter', desc: 'اختر موقعًا على طريق عام وسجّل مخالفة رمي مخلفات.' },
+      { id: 't_emp_4', title: 'تنفيذ مشروع تشجير مموَّل', kind: 'build', btype: 'tree', desc: 'نفّذ مشروع تشجير معتمد التمويل على الموقع المحدد.' },
+      { id: 't_emp_5', title: 'تنفيذ مشروع رصف طريق مموَّل', kind: 'build', btype: 'road', desc: 'نفّذ مشروع رصف طريق معتمد التمويل على الموقع المحدد.' },
+      { id: 't_emp_6', title: 'تنفيذ مشروع حديقة عامة مموَّل', kind: 'build', btype: 'park', desc: 'نفّذ مشروع حديقة معتمد التمويل من رئاسة البلدية على الموقع المحدد.' },
+      { id: 't_emp_7', title: 'تنفيذ مشروع نقطة تجميع نفايات', kind: 'build', btype: 'waste_point', desc: 'نفّذ مشروع نقطة تجميع نفايات معتمد التمويل.' },
     ],
   };
   return T[roleId] || [];
@@ -989,9 +1019,26 @@ function taskTemplatesFor(roleId) {
 
 /* ---------- تهيئة المهام عند اختيار دور لأول مرة ---------- */
 function ensureTasksForRole(roleId) {
-  if (!STATE.tasks[roleId]) {
-    STATE.tasks[roleId] = taskTemplatesFor(roleId).map(t => ({ ...t, done: false }));
+  if (roleId === 'chairman') {
+    if (!STATE.chairmanTasks) {
+      STATE.chairmanTasks = taskTemplatesFor(roleId).map(t => ({ ...t, done: false }));
+    }
+    return;
   }
+  const muni = currentMuniState();
+  if (!muni) return;
+  if (!muni.tasks[roleId]) {
+    muni.tasks[roleId] = taskTemplatesFor(roleId).map(t => ({ ...t, done: false }));
+  }
+}
+
+/* إرجاع قائمة مهام الدور الحالي (تُفرّق بين رئيس البلدية وبقية الأدوار المرتبطة بمديرية) */
+function currentRoleTasks() {
+  const role = currentRole();
+  if (!role) return [];
+  if (role.id === 'chairman') return STATE.chairmanTasks || [];
+  const muni = currentMuniState();
+  return (muni && muni.tasks[role.id]) || [];
 }
 
 /* ==========================================================
@@ -1051,24 +1098,25 @@ function initMap() {
 
   LAYER_GROUP = L.layerGroup().addTo(MAP);
 
-  // حدود تقريبية لمحافظة مسقط (تقريب بصري فقط)
-  DISTRICTS.forEach(d => {
-    L.circleMarker([d.lat, d.lng], {
-      radius: 4, color: '#0F2A3D', weight: 1, fillColor: '#C8961E', fillOpacity: .5,
-    }).addTo(MAP).bindTooltip(d.name, { permanent: false, direction: 'top', className: 'district-tip' });
-  });
-
   MAP.on('click', onMapClick);
   redrawMarkers();
 }
 
-function nearestDistrict(lat, lng) {
-  let best = DISTRICTS[0], bestD = Infinity;
-  DISTRICTS.forEach(d => {
-    const dd = Math.hypot(d.lat - lat, d.lng - lng);
-    if (dd < bestD) { bestD = dd; best = d; }
-  });
-  return best.name;
+/* تقريب الخريطة على حدود المديرية الحالية مع رسم إطار الحدود التقريبي */
+let MUNICIPALITY_BOUNDS_LAYER = null;
+function focusMapOnMunicipality(muni) {
+  if (!MAP || !muni) return;
+  MAP.fitBounds(muni.bounds, { padding: [20, 20] });
+
+  if (MUNICIPALITY_BOUNDS_LAYER) MAP.removeLayer(MUNICIPALITY_BOUNDS_LAYER);
+  MUNICIPALITY_BOUNDS_LAYER = L.rectangle(muni.bounds, {
+    color: '#C8961E', weight: 2, dashArray: '6 6', fill: true, fillColor: '#C8961E', fillOpacity: 0.03,
+  }).addTo(MAP);
+}
+
+function currentMunicipalityName() {
+  const m = MUNICIPALITIES.find(x => x.id === STATE.municipality);
+  return m ? m.name.replace('مديرية ', '') : '—';
 }
 
 function onMapClick(e) {
@@ -1080,17 +1128,19 @@ function onMapClick(e) {
 function placeAtLocation(lat, lng) {
   const p = PENDING_PLACEMENT;
   if (!p) return;
-  const district = nearestDistrict(lat, lng);
+  const district = currentMunicipalityName();
+  const muni = currentMuniState();
+  if (!muni) return;
 
   // أوقف وضع التنفيذ فورًا لمنع نقرات متكررة أثناء تشغيل التأثير
   PENDING_PLACEMENT = null;
   document.getElementById('map').style.cursor = '';
 
   if (p.kind === 'build') {
-    // ابحث عن مشروع ممول متاح من نفس النوع لم يُنفَّذ بعد
-    const project = STATE.projects.find(pr => pr.ptype === p.btype && pr.status === 'funded');
+    // ابحث عن مشروع ممول متاح من نفس النوع لم يُنفَّذ بعد في هذه المديرية
+    const project = muni.projects.find(pr => pr.ptype === p.btype && pr.status === 'funded');
     if (!project) {
-      toast(`لا يوجد مشروع مموَّل من نوع "${MARKER_STYLES[p.btype].label}" بعد. يجب أن يوجّه رئيس البلدية تمويلًا أولًا.`, 'error', '🚫');
+      toast(`لا يوجد مشروع مموَّل من نوع "${MARKER_STYLES[p.btype].label}" بعد في ${district}. يجب أن يوجّه رئيس البلدية تمويلًا أولًا.`, 'error', '🚫');
       return;
     }
     showWorkFx(lat, lng, p.btype, () => {
@@ -1100,7 +1150,7 @@ function placeAtLocation(lat, lng) {
       project.district = district;
       completeTask(p.taskId);
       toast(`تم تنفيذ: ${MARKER_STYLES[p.btype].label} في ${district} (من مشروع مموَّل)`, 'success', MARKER_STYLES[p.btype].emoji);
-      pushLog(MARKER_STYLES[p.btype].emoji, `${currentRole().name} نفّذ ${MARKER_STYLES[p.btype].label} في حي ${district} ضمن مشروع مموَّل من رئاسة البلدية`);
+      pushLog(MARKER_STYLES[p.btype].emoji, `${currentRole().name} نفّذ ${MARKER_STYLES[p.btype].label} في ${district} ضمن مشروع مموَّل من رئاسة البلدية`);
       saveAndRerender();
     });
     return;
@@ -1119,11 +1169,11 @@ function placeAtLocation(lat, lng) {
         reportedBy: currentRole().name,
         time: Date.now(),
       };
-      STATE.violations.push(v);
+      muni.violations.push(v);
       createMarker('violation', lat, lng, district, { violationId: v.id, vtype: p.vtype });
       completeTask(p.taskId);
       toast(`تم رصد مخالفة: ${VIOLATION_LABELS[p.vtype]}`, 'error', '⚠️');
-      pushLog('⚠️', `${currentRole().name} رصد مخالفة (${VIOLATION_LABELS[p.vtype]}) في حي ${district} — أُحيلت إلى مدير الدائرة`);
+      pushLog('⚠️', `${currentRole().name} رصد مخالفة (${VIOLATION_LABELS[p.vtype]}) في ${district} — أُحيلت إلى مدير الدائرة`);
       saveAndRerender();
     });
     return;
@@ -1140,23 +1190,27 @@ function placeAtLocation(lat, lng) {
       buildingType: p.buildingType || typeInfo.buildingType,
       time: Date.now(),
     };
-    STATE.requests.push(req);
+    muni.requests.push(req);
     createMarker('license', lat, lng, district, { requestId: req.id });
     toast(`تم استلام طلب ترخيص جديد في ${district}`, 'info', '📄');
-    pushLog('📄', `طلب ترخيص بناء جديد (${req.buildingType}) في حي ${district} — أُحيل إلى مدير الدائرة`);
+    pushLog('📄', `طلب ترخيص بناء جديد (${req.buildingType}) في ${district} — أُحيل إلى مدير الدائرة`);
     saveAndRerender();
   }
 }
 
 function createMarker(type, lat, lng, district, meta = {}) {
+  const muni = currentMuniState();
+  if (!muni) return null;
   const m = { id: uid('mk'), type, lat, lng, district, meta, createdAt: Date.now() };
-  STATE.markers.push(m);
+  muni.markers.push(m);
   return m;
 }
 
 function applyBuildEffects(btype) {
   // الميزانية تُخصم عند التمويل من رئيس البلدية، وليس عند التنفيذ الهندسي
-  const s = STATE.stats;
+  const muni = currentMuniState();
+  if (!muni) return;
+  const s = muni.stats;
   if (btype === 'tree') { s.trees += 1; s.devPoints += 2; s.citizenSatisfaction = clamp(s.citizenSatisfaction + 1, 0, 100); }
   if (btype === 'park') { s.parks += 1; s.devPoints += 8; s.citizenSatisfaction = clamp(s.citizenSatisfaction + 4, 0, 100); }
   if (btype === 'road') { s.roadsKm += 1; s.devPoints += 5; s.citizenSatisfaction = clamp(s.citizenSatisfaction + 2, 0, 100); }
@@ -1182,16 +1236,19 @@ function iconFor(type) {
 
 function redrawMarkers() {
   LAYER_GROUP.clearLayers();
-  STATE.markers.forEach(m => {
+  if (!STATE.municipality) return; // رئيس البلدية لا يشاهد علامات مديرية معينة حاليًا
+  const muni = currentMuniState();
+  if (!muni) return;
+  muni.markers.forEach(m => {
     let displayType = m.type;
     let statusNote = '';
     if (m.type === 'violation') {
-      const v = STATE.violations.find(x => x.id === m.meta.violationId);
+      const v = muni.violations.find(x => x.id === m.meta.violationId);
       if (v && v.status !== 'pending') return; // أُزيلت بعد المعالجة
       statusNote = v ? VIOLATION_LABELS[v.type] : '';
     }
     if (m.type === 'license') {
-      const r = STATE.requests.find(x => x.id === m.meta.requestId);
+      const r = muni.requests.find(x => x.id === m.meta.requestId);
       if (!r || r.status !== 'pending') return; // بعد البت فيها تختفي
     }
     const st = MARKER_STYLES[displayType];
@@ -1209,37 +1266,90 @@ function saveAndRerender() {
 /* ==========================================================
    واجهة المستخدم
    ========================================================== */
+let SELECTED_MUNI_ID = null;   // null يعني اختيار رئيس البلدية
 let SELECTED_ROLE_ID = null;
+let SELECTING_CHAIRMAN = false;
 
 function currentRole() {
   return ROLES.find(r => r.id === STATE.role) || null;
 }
 
 function buildRoleSelectScreen() {
-  const groups = { top: [], mid: [], eng: [] };
-  ROLES.forEach(r => groups[r.tier].push(r));
+  // بطاقة رئيس البلدية (نطاق مستقل فوق كل المديريات)
+  const chairmanGrid = document.getElementById('chairmanGrid');
+  chairmanGrid.innerHTML = '';
+  const chCard = document.createElement('div');
+  chCard.className = 'role-card';
+  chCard.dataset.scope = 'chairman';
+  chCard.innerHTML = `
+    <div class="rc-icon">${CHAIRMAN_ROLE.icon}</div>
+    <div class="rc-name">${CHAIRMAN_ROLE.name}</div>
+    <div class="rc-desc">${CHAIRMAN_ROLE.desc}</div>
+  `;
+  chCard.addEventListener('click', () => selectChairmanScope());
+  chairmanGrid.appendChild(chCard);
 
-  Object.entries(TIER_LABELS).forEach(([tier, gridId]) => {
-    const grid = document.getElementById(gridId);
-    grid.innerHTML = '';
-    groups[tier].forEach(r => {
-      const card = document.createElement('div');
-      card.className = 'role-card';
-      card.dataset.role = r.id;
-      card.innerHTML = `
-        <div class="rc-icon">${r.icon}</div>
-        <div class="rc-name">${r.name}</div>
-        <div class="rc-desc">${r.desc}</div>
-      `;
-      card.addEventListener('click', () => selectRoleCard(r.id));
-      grid.appendChild(card);
-    });
+  // بطاقات المديريات الست
+  const muniGrid = document.getElementById('municipalityGrid');
+  muniGrid.innerHTML = '';
+  MUNICIPALITIES.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'role-card';
+    card.dataset.scope = m.id;
+    card.innerHTML = `
+      <div class="rc-icon">${m.icon}</div>
+      <div class="rc-name">${m.name}</div>
+      <div class="rc-desc">إدارة شؤون ولاية ${m.name.replace('مديرية ', '')} وتنميتها</div>
+    `;
+    card.addEventListener('click', () => selectMunicipalityScope(m.id));
+    muniGrid.appendChild(card);
   });
 }
 
-function selectRoleCard(roleId) {
+function selectChairmanScope() {
+  SELECTING_CHAIRMAN = true;
+  SELECTED_MUNI_ID = null;
+  SELECTED_ROLE_ID = 'chairman';
+  document.getElementById('startBtn').disabled = false;
+  document.querySelectorAll('#chairmanGrid .role-card, #municipalityGrid .role-card').forEach(c => {
+    c.classList.toggle('selected', c.dataset.scope === 'chairman');
+  });
+  // إخفاء خطوة اختيار الوظيفة إن كانت ظاهرة، لأن رئيس البلدية دور مباشر بلا خطوة ثانية
+  document.getElementById('jobStep').classList.add('hidden');
+  document.getElementById('scopeStep').classList.remove('hidden');
+}
+
+function selectMunicipalityScope(muniId) {
+  SELECTING_CHAIRMAN = false;
+  SELECTED_MUNI_ID = muniId;
+  SELECTED_ROLE_ID = null;
+  document.getElementById('startBtn').disabled = true;
+
+  const muni = MUNICIPALITIES.find(m => m.id === muniId);
+  document.getElementById('jobStepTitle').textContent = `اختر وظيفتك في ${muni.name}`;
+
+  const jobGrid = document.getElementById('jobGrid');
+  jobGrid.innerHTML = '';
+  MUNICIPALITY_ROLES.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'role-card';
+    card.dataset.role = r.id;
+    card.innerHTML = `
+      <div class="rc-icon">${r.icon}</div>
+      <div class="rc-name">${r.name}</div>
+      <div class="rc-desc">${r.desc}</div>
+    `;
+    card.addEventListener('click', () => selectJobRole(r.id));
+    jobGrid.appendChild(card);
+  });
+
+  document.getElementById('scopeStep').classList.add('hidden');
+  document.getElementById('jobStep').classList.remove('hidden');
+}
+
+function selectJobRole(roleId) {
   SELECTED_ROLE_ID = roleId;
-  document.querySelectorAll('.role-card').forEach(c => {
+  document.querySelectorAll('#jobGrid .role-card').forEach(c => {
     c.classList.toggle('selected', c.dataset.role === roleId);
   });
   document.getElementById('startBtn').disabled = false;
@@ -1247,9 +1357,14 @@ function selectRoleCard(roleId) {
 
 async function startGame() {
   if (!SELECTED_ROLE_ID) return;
+  if (SELECTED_ROLE_ID !== 'chairman' && !SELECTED_MUNI_ID) return;
+
   STATE.role = SELECTED_ROLE_ID;
+  STATE.municipality = SELECTED_ROLE_ID === 'chairman' ? null : SELECTED_MUNI_ID;
+
   ensureTasksForRole(STATE.role);
-  if (!STATE.seeded) seedInitialData();
+  const muni = currentMuniState();
+  if (muni && !muni.seeded) seedInitialData();
   await saveState();
 
   document.getElementById('startScreen').classList.add('hidden');
@@ -1258,67 +1373,114 @@ async function startGame() {
   if (!MAP) initMap();
   else setTimeout(() => MAP.invalidateSize(), 100);
 
+  if (STATE.municipality) {
+    const m = MUNICIPALITIES.find(x => x.id === STATE.municipality);
+    setTimeout(() => focusMapOnMunicipality(m), 150);
+  } else if (MUNICIPALITY_BOUNDS_LAYER && MAP) {
+    MAP.removeLayer(MUNICIPALITY_BOUNDS_LAYER);
+    MUNICIPALITY_BOUNDS_LAYER = null;
+    MAP.setView(MUSCAT_CENTER, MUSCAT_ZOOM);
+  }
+
   updateRoleChip();
   renderAll();
-  pushLog(currentRole().icon, `${currentRole().name} بدأ مناوبة العمل في بلدية مسقط`);
+  const scopeLabel = STATE.municipality ? currentMunicipalityName() : 'رئاسة البلدية';
+  pushLog(currentRole().icon, `${currentRole().name} بدأ مناوبة العمل في ${scopeLabel}`);
   saveAndRerender();
 }
 
 function updateRoleChip() {
   const r = currentRole();
-  document.getElementById('currentRoleChip').textContent = `${r.icon} ${r.name}`;
+  const scopeLabel = STATE.municipality ? ` · ${currentMunicipalityName()}` : ' · رئاسة البلدية';
+  document.getElementById('currentRoleChip').textContent = `${r.icon} ${r.name}${scopeLabel}`;
 }
 
 /* ---------- بيانات أولية عند أول تشغيل ---------- */
 function seedInitialData() {
-  // بضعة طلبات تراخيص وملاحظات ابتدائية لتنشيط اللعبة (بأحجام مختلفة لتجربة التصعيد)
+  const muni = currentMuniState();
+  const muniDef = MUNICIPALITIES.find(m => m.id === STATE.municipality);
+  if (!muni || !muniDef) return;
+  const district = muniDef.name.replace('مديرية ', '');
+  const [[south, west], [north, east]] = muniDef.bounds;
+  const midLat = (south + north) / 2;
+  const midLng = (west + east) / 2;
+  const qLat = (north - south) / 4;
+  const qLng = (east - west) / 4;
+
+  // بضعة طلبات تراخيص ابتدائية بأحجام مختلفة لتجربة التصعيد، موزّعة داخل حدود المديرية
   const seedReqs = [
-    { district: 'بوشر', lat: 23.5895, lng: 58.3955, buildingType: 'فيلا سكنية' },       // صغير -> يكفي المدير العام
-    { district: 'السيب', lat: 23.6720, lng: 58.1910, buildingType: 'مبنى تجاري' },      // متوسط -> يكفي المدير العام
-    { district: 'العامرات', lat: 23.5295, lng: 58.4470, buildingType: 'مجمع سكني' },   // كبير -> يلزم رئيس البلدية
+    { lat: midLat + qLat, lng: midLng - qLng, buildingType: 'فيلا سكنية' },   // صغير -> يكفي المدير العام
+    { lat: midLat - qLat, lng: midLng + qLng, buildingType: 'مبنى تجاري' },   // متوسط -> يكفي المدير العام
+    { lat: midLat, lng: midLng, buildingType: 'مجمع سكني' },                  // كبير -> يلزم رئيس البلدية
   ];
   seedReqs.forEach(sr => {
     const typeInfo = LICENSE_TYPES.find(x => x.buildingType === sr.buildingType) || LICENSE_TYPES[0];
     const req = {
-      id: uid('lic'), ...sr, status: 'pending',
+      id: uid('lic'), lat: sr.lat, lng: sr.lng, district, status: 'pending',
       currentLevel: 0, requiredLevel: typeInfo.requiredLevel, scale: typeInfo.scale,
+      buildingType: sr.buildingType,
       applicant: 'مواطن / مطوّر عقاري', time: Date.now(),
     };
-    STATE.requests.push(req);
-    createMarker('license', sr.lat, sr.lng, sr.district, { requestId: req.id });
+    muni.requests.push(req);
+    const m = { id: uid('mk'), type: 'license', lat: sr.lat, lng: sr.lng, district, meta: { requestId: req.id }, createdAt: Date.now() };
+    muni.markers.push(m);
   });
 
   const seedViol = [
-    { district: 'مطرح', lat: 23.6165, lng: 58.5945, type: 'debris' },   // متوسط -> يكفي المدير العام
-    { district: 'الخوض', lat: 23.5965, lng: 58.2820, type: 'litter' },  // صغير -> يكفي المدير العام
+    { lat: midLat - qLat, lng: midLng - qLng, type: 'debris' },   // متوسط -> يكفي المدير العام
+    { lat: midLat + qLat, lng: midLng + qLng, type: 'litter' },   // صغير -> يكفي المدير العام
   ];
   seedViol.forEach(sv => {
     const fineInfo = VIOLATION_FINE_TABLE[sv.type];
     const v = {
-      id: uid('viol'), ...sv, status: 'pending',
+      id: uid('viol'), lat: sv.lat, lng: sv.lng, district, type: sv.type, status: 'pending',
       currentLevel: 0, requiredLevel: fineInfo.requiredLevel, scale: fineInfo.scale, fineAmount: fineInfo.fineAmount,
       reportedBy: 'دورية ميدانية', time: Date.now(),
     };
-    STATE.violations.push(v);
-    createMarker('violation', sv.lat, sv.lng, sv.district, { violationId: v.id, vtype: sv.type });
+    muni.violations.push(v);
+    const m = { id: uid('mk'), type: 'violation', lat: sv.lat, lng: sv.lng, district, meta: { violationId: v.id, vtype: sv.type }, createdAt: Date.now() };
+    muni.markers.push(m);
   });
 
-  // مشروع تشجير ممول مسبقًا حتى يستطيع المهندس الزراعي البدء فورًا
-  STATE.projects.push({
+  // مشروع تشجير ممول مسبقًا حتى يستطيع المهندس الزراعي البدء فورًا في هذه المديرية
+  muni.projects.push({
     id: uid('proj'), ptype: 'tree', units: 15, cost: 15 * PROJECT_TYPES.tree.unitCost,
     status: 'funded', fundedBy: 'رئيس البلدية (اعتماد افتتاحي)', time: Date.now(),
   });
-  STATE.stats.generalBudget -= 15 * PROJECT_TYPES.tree.unitCost;
+  STATE.generalBudget -= 15 * PROJECT_TYPES.tree.unitCost;
 
-  STATE.seeded = true;
+  muni.seeded = true;
 }
 
 /* ---------- شريط الإحصائيات العلوي ---------- */
 function renderStatsBar() {
-  const s = STATE.stats;
+  const role = currentRole();
   const bar = document.getElementById('statsBar');
+
+  if (role.id === 'chairman') {
+    // نظرة إجمالية عبر كل المديريات لرئيس البلدية
+    let totalDev = 0, totalTrees = 0, totalParks = 0, totalRoads = 0, avgSat = 0;
+    MUNICIPALITIES.forEach(m => {
+      const s = STATE.municipalities[m.id].stats;
+      totalDev += s.devPoints; totalTrees += s.trees; totalParks += s.parks; totalRoads += s.roadsKm;
+      avgSat += s.citizenSatisfaction;
+    });
+    avgSat = Math.round(avgSat / MUNICIPALITIES.length);
+    bar.innerHTML = `
+      <div class="stat-pill"><span class="si">💰</span> <b>${STATE.generalBudget.toLocaleString('ar-OM')}</b> ر.ع</div>
+      <div class="stat-pill"><span class="si">📈</span> نمو إجمالي <b>${totalDev}</b></div>
+      <div class="stat-pill"><span class="si">🌳</span> <b>${totalTrees}</b></div>
+      <div class="stat-pill"><span class="si">🌿</span> <b>${totalParks}</b></div>
+      <div class="stat-pill"><span class="si">🛣️</span> <b>${totalRoads}</b> كم</div>
+      <div class="stat-pill"><span class="si">😊</span> رضا (متوسط) <b>${avgSat}%</b></div>
+    `;
+    return;
+  }
+
+  const muni = currentMuniState();
+  const s = muni.stats;
   bar.innerHTML = `
-    <div class="stat-pill"><span class="si">💰</span> <b>${s.generalBudget.toLocaleString('ar-OM')}</b> ر.ع</div>
+    <div class="stat-pill"><span class="si">💰</span> <b>${STATE.generalBudget.toLocaleString('ar-OM')}</b> ر.ع</div>
     <div class="stat-pill"><span class="si">📈</span> نمو <b>${s.devPoints}</b></div>
     <div class="stat-pill"><span class="si">🌳</span> <b>${s.trees}</b></div>
     <div class="stat-pill"><span class="si">🌿</span> <b>${s.parks}</b></div>
@@ -1331,7 +1493,7 @@ function renderStatsBar() {
 function renderTasksPane() {
   const pane = document.getElementById('tasksPane');
   const role = currentRole();
-  const tasks = STATE.tasks[role.id] || [];
+  const tasks = currentRoleTasks();
 
   if (tasks.length === 0) {
     pane.innerHTML = `<div class="empty-state">لا توجد مهام محددة لهذا الدور حاليًا.</div>`;
@@ -1396,8 +1558,11 @@ function openTask(t) {
     toast('راجع المخالفات المعلقة في تبويب "الطلبات"', 'info', '⚠️');
   } else if (t.kind === 'directive') {
     completeTask(t.id);
-    STATE.stats.devPoints += 3;
-    STATE.stats.citizenSatisfaction = clamp(STATE.stats.citizenSatisfaction + 2, 0, 100);
+    const muni = currentMuniState();
+    if (muni) {
+      muni.stats.devPoints += 3;
+      muni.stats.citizenSatisfaction = clamp(muni.stats.citizenSatisfaction + 2, 0, 100);
+    }
     playSound('directive');
     toast('تم إصدار التوجيه بنجاح', 'success', '📢');
     pushLog('📢', `${currentRole().name} أصدر توجيهًا: ${t.title}`);
@@ -1415,6 +1580,10 @@ function openFundPanel(t) {
   const pt = PROJECT_TYPES[t.ptype];
   document.getElementById('fundTitle').textContent = `توجيه تمويل: ${pt.name}`;
   document.getElementById('fundUnits').value = 10;
+
+  const sel = document.getElementById('fundMuniSelect');
+  sel.innerHTML = MUNICIPALITIES.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+
   updateFundPreview();
   document.getElementById('fundPanel').classList.add('show');
   document.getElementById('mapPanel').classList.remove('show');
@@ -1426,10 +1595,9 @@ function updateFundPreview() {
   const units = Math.max(1, parseInt(document.getElementById('fundUnits').value || '1', 10));
   const cost = units * pt.unitCost;
   const preview = document.getElementById('fundCostPreview');
-  const s = STATE.stats;
   preview.innerHTML = `التكلفة التقديرية: <b>${cost.toLocaleString('ar-OM')}</b> ر.ع (${units} ${pt.unit} × ${pt.unitCost} ر.ع)
-    <br>الميزانية العمومية المتاحة: <b>${s.generalBudget.toLocaleString('ar-OM')}</b> ر.ع`;
-  preview.style.color = cost > s.generalBudget ? 'var(--red)' : '#666';
+    <br>الميزانية العمومية المتاحة: <b>${STATE.generalBudget.toLocaleString('ar-OM')}</b> ر.ع`;
+  preview.style.color = cost > STATE.generalBudget ? 'var(--red)' : '#666';
 }
 
 function confirmFundProject() {
@@ -1438,13 +1606,18 @@ function confirmFundProject() {
   const pt = PROJECT_TYPES[t.ptype];
   const units = Math.max(1, parseInt(document.getElementById('fundUnits').value || '1', 10));
   const cost = units * pt.unitCost;
+  const muniId = document.getElementById('fundMuniSelect').value;
+  const muniDef = MUNICIPALITIES.find(m => m.id === muniId);
+  const muni = STATE.municipalities[muniId];
 
-  if (cost > STATE.stats.generalBudget) {
+  if (!muni || !muniDef) return;
+
+  if (cost > STATE.generalBudget) {
     toast('الميزانية العمومية لا تكفي لهذا التمويل', 'error', '🚫');
     return;
   }
 
-  STATE.stats.generalBudget -= cost;
+  STATE.generalBudget -= cost;
   const project = {
     id: uid('proj'),
     ptype: t.ptype,
@@ -1454,12 +1627,13 @@ function confirmFundProject() {
     fundedBy: currentRole().name,
     time: Date.now(),
   };
-  STATE.projects.push(project);
+  muni.projects.push(project);
   completeTask(t.id);
 
   playSound('fund');
-  toast(`تم اعتماد تمويل ${pt.name} بمبلغ ${cost.toLocaleString('ar-OM')} ر.ع`, 'success', pt.icon);
-  pushLog(pt.icon, `رئيس البلدية وجّه تمويلًا بقيمة ${cost.toLocaleString('ar-OM')} ر.ع لـ ${pt.name} — بانتظار التنفيذ الهندسي`);
+  toast(`تم اعتماد تمويل ${pt.name} بمبلغ ${cost.toLocaleString('ar-OM')} ر.ع لـ ${muniDef.name}`, 'success', pt.icon);
+  pushLog(pt.icon, `رئيس البلدية وجّه تمويلًا بقيمة ${cost.toLocaleString('ar-OM')} ر.ع لـ ${pt.name} في ${muniDef.name} — بانتظار التنفيذ الميداني`, muniId);
+  pushChairmanLog(pt.icon, `تم توجيه تمويل بقيمة ${cost.toLocaleString('ar-OM')} ر.ع لـ ${pt.name} في ${muniDef.name}`);
 
   document.getElementById('fundPanel').classList.remove('show');
   FUND_TASK_CTX = null;
@@ -1467,13 +1641,49 @@ function confirmFundProject() {
 }
 
 function completeTask(taskId) {
-  const role = currentRole();
-  const list = STATE.tasks[role.id] || [];
+  const list = currentRoleTasks();
   const t = list.find(x => x.id === taskId);
   if (t) t.done = true;
 }
 
 /* ---------- تبويب: الطلبات (تراخيص + مخالفات) ---------- */
+
+/* إرجاع كل الطلبات المعلقة ذات الصلة بالدور الحالي، مع اسم المديرية لكل عنصر.
+   لرئيس البلدية: من كل المديريات. لبقية الأدوار: من مديريته الحالية فقط. */
+function relevantPendingLicenses() {
+  const role = currentRole();
+  if (!role) return [];
+  if (role.id === 'chairman') {
+    const out = [];
+    MUNICIPALITIES.forEach(m => {
+      const muni = STATE.municipalities[m.id];
+      muni.requests.filter(r => r.status === 'pending').forEach(r => out.push({ req: r, muniId: m.id, muniName: m.name }));
+    });
+    return out;
+  }
+  const muni = currentMuniState();
+  if (!muni) return [];
+  const muniDef = MUNICIPALITIES.find(m => m.id === STATE.municipality);
+  return muni.requests.filter(r => r.status === 'pending').map(r => ({ req: r, muniId: STATE.municipality, muniName: muniDef.name }));
+}
+
+function relevantPendingViolations() {
+  const role = currentRole();
+  if (!role) return [];
+  if (role.id === 'chairman') {
+    const out = [];
+    MUNICIPALITIES.forEach(m => {
+      const muni = STATE.municipalities[m.id];
+      muni.violations.filter(v => v.status === 'pending').forEach(v => out.push({ viol: v, muniId: m.id, muniName: m.name }));
+    });
+    return out;
+  }
+  const muni = currentMuniState();
+  if (!muni) return [];
+  const muniDef = MUNICIPALITIES.find(m => m.id === STATE.municipality);
+  return muni.violations.filter(v => v.status === 'pending').map(v => ({ viol: v, muniId: STATE.municipality, muniName: muniDef.name }));
+}
+
 function renderReqPane() {
   const pane = document.getElementById('reqPane');
   const role = currentRole();
@@ -1481,28 +1691,28 @@ function renderReqPane() {
 
   // التراخيص
   pane.innerHTML += `<div class="section-title"><span class="dot"></span>طلبات تراخيص البناء</div>`;
-  const pendingLic = STATE.requests.filter(r => r.status === 'pending');
+  const pendingLic = relevantPendingLicenses();
   if (pendingLic.length === 0) {
     pane.innerHTML += `<div class="empty-state">لا توجد طلبات تراخيص معلقة حاليًا.</div>`;
   } else {
-    pendingLic.forEach(r => {
-      pane.appendChild(buildLicenseCard(r, role));
+    pendingLic.forEach(({ req, muniId, muniName }) => {
+      pane.appendChild(buildLicenseCard(req, role, muniId, muniName));
     });
   }
 
   // المخالفات
   pane.innerHTML += `<div class="section-title"><span class="dot"></span>المخالفات المرصودة</div>`;
-  const pendingV = STATE.violations.filter(v => v.status === 'pending');
+  const pendingV = relevantPendingViolations();
   if (pendingV.length === 0) {
     pane.innerHTML += `<div class="empty-state">لا توجد مخالفات معلقة حاليًا.</div>`;
   } else {
-    pendingV.forEach(v => {
-      pane.appendChild(buildViolationCard(v, role));
+    pendingV.forEach(({ viol, muniId, muniName }) => {
+      pane.appendChild(buildViolationCard(viol, role, muniId, muniName));
     });
   }
 
   pane.querySelectorAll('button[data-act]').forEach(btn => {
-    btn.addEventListener('click', () => handleReqAction(btn.dataset.act, btn.dataset.id, btn.dataset.kind));
+    btn.addEventListener('click', () => handleReqAction(btn.dataset.act, btn.dataset.id, btn.dataset.kind, btn.dataset.muni));
   });
 }
 
@@ -1513,11 +1723,12 @@ const ESCALATION_STAGE_LABEL = {
 };
 const ESCALATION_STAGE_ROLE = { 0: 'director', 1: 'general_director', 2: 'chairman' };
 
-function buildLicenseCard(r, role) {
+function buildLicenseCard(r, role, muniId, muniName) {
   const div = document.createElement('div');
   div.className = 'task-card';
   const stage = ESCALATION_STAGE_LABEL[r.currentLevel];
   const isMyDesk = ESCALATION_STAGE_ROLE[r.currentLevel] === role.id;
+  const muniTag = role.id === 'chairman' ? ` · ${muniName}` : '';
 
   let actionsHtml = `<div class="badge ${stage.badge}" style="margin-top:6px;">${stage.label}</div>`;
 
@@ -1526,47 +1737,48 @@ function buildLicenseCard(r, role) {
       // مدير الدائرة لا يعتمد نهائيًا، فقط يرفع توصيته للمدير العام
       actionsHtml = `
         <div class="btn-row" style="margin-top:8px;">
-          <button class="btn btn-primary btn-sm" data-act="escalate_up" data-id="${r.id}" data-kind="license">رفع للمدير العام</button>
-          <button class="btn btn-reject btn-sm" data-act="reject" data-id="${r.id}" data-kind="license">رفض مبدئي</button>
+          <button class="btn btn-primary btn-sm" data-act="escalate_up" data-id="${r.id}" data-kind="license" data-muni="${muniId}">رفع للمدير العام</button>
+          <button class="btn btn-reject btn-sm" data-act="reject" data-id="${r.id}" data-kind="license" data-muni="${muniId}">رفض مبدئي</button>
         </div>`;
     } else if (role.id === 'general_director') {
       if (r.requiredLevel <= 2) {
         actionsHtml = `
           <div class="btn-row" style="margin-top:8px;">
-            <button class="btn btn-approve btn-sm" data-act="approve" data-id="${r.id}" data-kind="license">اعتماد نهائي</button>
-            <button class="btn btn-reject btn-sm" data-act="reject" data-id="${r.id}" data-kind="license">رفض</button>
+            <button class="btn btn-approve btn-sm" data-act="approve" data-id="${r.id}" data-kind="license" data-muni="${muniId}">اعتماد نهائي</button>
+            <button class="btn btn-reject btn-sm" data-act="reject" data-id="${r.id}" data-kind="license" data-muni="${muniId}">رفض</button>
           </div>`;
       } else {
         actionsHtml = `
           <div class="badge urgent" style="margin-top:6px; display:block;">يتجاوز صلاحيتك — يلزم اعتماد رئيس البلدية</div>
           <div class="btn-row" style="margin-top:8px;">
-            <button class="btn btn-primary btn-sm" data-act="escalate_up" data-id="${r.id}" data-kind="license">رفع لرئيس البلدية</button>
-            <button class="btn btn-reject btn-sm" data-act="reject" data-id="${r.id}" data-kind="license">رفض</button>
+            <button class="btn btn-primary btn-sm" data-act="escalate_up" data-id="${r.id}" data-kind="license" data-muni="${muniId}">رفع لرئيس البلدية</button>
+            <button class="btn btn-reject btn-sm" data-act="reject" data-id="${r.id}" data-kind="license" data-muni="${muniId}">رفض</button>
           </div>`;
       }
     } else if (role.id === 'chairman') {
       actionsHtml = `
         <div class="btn-row" style="margin-top:8px;">
-          <button class="btn btn-approve btn-sm" data-act="approve" data-id="${r.id}" data-kind="license">اعتماد نهائي</button>
-          <button class="btn btn-reject btn-sm" data-act="reject" data-id="${r.id}" data-kind="license">رفض</button>
+          <button class="btn btn-approve btn-sm" data-act="approve" data-id="${r.id}" data-kind="license" data-muni="${muniId}">اعتماد نهائي</button>
+          <button class="btn btn-reject btn-sm" data-act="reject" data-id="${r.id}" data-kind="license" data-muni="${muniId}">رفض</button>
         </div>`;
     }
   }
 
   div.innerHTML = `
-    <div class="tc-title">${r.buildingType} — ${r.district} <span class="badge gold">${SCALE_LABELS[r.scale]}</span></div>
+    <div class="tc-title">${r.buildingType} — ${r.district}${muniTag} <span class="badge gold">${SCALE_LABELS[r.scale]}</span></div>
     <div class="tc-meta"><span>مقدّم الطلب: ${r.applicant}</span></div>
     ${actionsHtml}
   `;
   return div;
 }
 
-function buildViolationCard(v, role) {
+function buildViolationCard(v, role, muniId, muniName) {
   const div = document.createElement('div');
   div.className = 'task-card';
   div.style.borderRightColor = 'var(--red)';
   const stage = ESCALATION_STAGE_LABEL[v.currentLevel];
   const isMyDesk = ESCALATION_STAGE_ROLE[v.currentLevel] === role.id;
+  const muniTag = role.id === 'chairman' ? ` · ${muniName}` : '';
 
   let actionsHtml = `<div class="badge ${stage.badge}" style="margin-top:6px;">${stage.label}</div>`;
 
@@ -1574,46 +1786,48 @@ function buildViolationCard(v, role) {
     if (role.id === 'director') {
       actionsHtml = `
         <div class="btn-row" style="margin-top:8px;">
-          <button class="btn btn-primary btn-sm" data-act="escalate_up" data-id="${v.id}" data-kind="violation">رفع للمدير العام</button>
-          <button class="btn btn-outline btn-sm" data-act="dismiss" data-id="${v.id}" data-kind="violation">تجاهل (لا مخالفة)</button>
+          <button class="btn btn-primary btn-sm" data-act="escalate_up" data-id="${v.id}" data-kind="violation" data-muni="${muniId}">رفع للمدير العام</button>
+          <button class="btn btn-outline btn-sm" data-act="dismiss" data-id="${v.id}" data-kind="violation" data-muni="${muniId}">تجاهل (لا مخالفة)</button>
         </div>`;
     } else if (role.id === 'general_director') {
       if (v.requiredLevel <= 2) {
         actionsHtml = `
           <div class="btn-row" style="margin-top:8px;">
-            <button class="btn btn-reject btn-sm" data-act="fine" data-id="${v.id}" data-kind="violation">فرض غرامة وإزالة</button>
-            <button class="btn btn-outline btn-sm" data-act="dismiss" data-id="${v.id}" data-kind="violation">تجاهل</button>
+            <button class="btn btn-reject btn-sm" data-act="fine" data-id="${v.id}" data-kind="violation" data-muni="${muniId}">فرض غرامة وإزالة</button>
+            <button class="btn btn-outline btn-sm" data-act="dismiss" data-id="${v.id}" data-kind="violation" data-muni="${muniId}">تجاهل</button>
           </div>`;
       } else {
         actionsHtml = `
           <div class="badge urgent" style="margin-top:6px; display:block;">غرامة كبرى — يلزم اعتماد رئيس البلدية</div>
           <div class="btn-row" style="margin-top:8px;">
-            <button class="btn btn-primary btn-sm" data-act="escalate_up" data-id="${v.id}" data-kind="violation">رفع لرئيس البلدية</button>
-            <button class="btn btn-outline btn-sm" data-act="dismiss" data-id="${v.id}" data-kind="violation">تجاهل</button>
+            <button class="btn btn-primary btn-sm" data-act="escalate_up" data-id="${v.id}" data-kind="violation" data-muni="${muniId}">رفع لرئيس البلدية</button>
+            <button class="btn btn-outline btn-sm" data-act="dismiss" data-id="${v.id}" data-kind="violation" data-muni="${muniId}">تجاهل</button>
           </div>`;
       }
     } else if (role.id === 'chairman') {
       actionsHtml = `
         <div class="btn-row" style="margin-top:8px;">
-          <button class="btn btn-reject btn-sm" data-act="fine" data-id="${v.id}" data-kind="violation">فرض غرامة وإزالة</button>
-          <button class="btn btn-outline btn-sm" data-act="dismiss" data-id="${v.id}" data-kind="violation">تجاهل</button>
+          <button class="btn btn-reject btn-sm" data-act="fine" data-id="${v.id}" data-kind="violation" data-muni="${muniId}">فرض غرامة وإزالة</button>
+          <button class="btn btn-outline btn-sm" data-act="dismiss" data-id="${v.id}" data-kind="violation" data-muni="${muniId}">تجاهل</button>
         </div>`;
     }
   }
 
   div.innerHTML = `
-    <div class="tc-title">${VIOLATION_LABELS[v.type]} <span class="badge urgent">${SCALE_LABELS[v.scale]}</span></div>
+    <div class="tc-title">${VIOLATION_LABELS[v.type]}${muniTag} <span class="badge urgent">${SCALE_LABELS[v.scale]}</span></div>
     <div class="tc-meta"><span>${v.district}</span><span>رصدها: ${v.reportedBy}</span></div>
     ${actionsHtml}
   `;
   return div;
 }
 
-function handleReqAction(act, id, kind) {
+function handleReqAction(act, id, kind, muniId) {
   const role = currentRole();
+  const muni = STATE.municipalities[muniId];
+  if (!muni) return;
 
   if (kind === 'license') {
-    const r = STATE.requests.find(x => x.id === id);
+    const r = muni.requests.find(x => x.id === id);
     if (!r) return;
 
     if (act === 'escalate_up') {
@@ -1621,27 +1835,27 @@ function handleReqAction(act, id, kind) {
       const nextRoleName = ROLES.find(x => x.id === ESCALATION_STAGE_ROLE[r.currentLevel]).name;
       playSound('directive');
       toast(`تم رفع طلب الترخيص إلى ${nextRoleName}`, 'info', '📤');
-      pushLog('📤', `${role.name} رفع طلب ترخيص بناء (${r.buildingType}) في ${r.district} إلى ${nextRoleName}`);
+      pushLog('📤', `${role.name} رفع طلب ترخيص بناء (${r.buildingType}) في ${r.district} إلى ${nextRoleName}`, muniId);
     } else if (act === 'approve') {
       r.status = 'approved';
-      STATE.stats.licensesIssued += 1;
-      STATE.stats.devPoints += 4;
-      STATE.stats.generalBudget += 3000; STATE.stats.operatingRevenue += 3000;
+      muni.stats.licensesIssued += 1;
+      muni.stats.devPoints += 4;
+      STATE.generalBudget += 3000; STATE.operatingRevenue += 3000;
       playSound('license_approve');
       toast(`تم اعتماد ترخيص البناء (${r.buildingType})`, 'success', '✅');
-      pushLog('✅', `${role.name} اعتمد نهائيًا ترخيص بناء (${r.buildingType}) في ${r.district}`);
+      pushLog('✅', `${role.name} اعتمد نهائيًا ترخيص بناء (${r.buildingType}) في ${r.district}`, muniId);
     } else if (act === 'reject') {
       r.status = 'rejected';
-      STATE.stats.citizenSatisfaction = clamp(STATE.stats.citizenSatisfaction - 1, 0, 100);
+      muni.stats.citizenSatisfaction = clamp(muni.stats.citizenSatisfaction - 1, 0, 100);
       playSound('license_reject');
       toast(`تم رفض طلب الترخيص`, 'error', '❌');
-      pushLog('❌', `${role.name} رفض طلب ترخيص بناء في ${r.district}`);
+      pushLog('❌', `${role.name} رفض طلب ترخيص بناء في ${r.district}`, muniId);
     }
-    completeAnyLicenseTask(role);
+    completeAnyLicenseTask(role, muniId);
   }
 
   if (kind === 'violation') {
-    const v = STATE.violations.find(x => x.id === id);
+    const v = muni.violations.find(x => x.id === id);
     if (!v) return;
 
     if (act === 'escalate_up') {
@@ -1649,50 +1863,105 @@ function handleReqAction(act, id, kind) {
       const nextRoleName = ROLES.find(x => x.id === ESCALATION_STAGE_ROLE[v.currentLevel]).name;
       playSound('directive');
       toast(`تم رفع المخالفة إلى ${nextRoleName}`, 'info', '📤');
-      pushLog('📤', `${role.name} رفع مخالفة (${VIOLATION_LABELS[v.type]}) في ${v.district} إلى ${nextRoleName}`);
+      pushLog('📤', `${role.name} رفع مخالفة (${VIOLATION_LABELS[v.type]}) في ${v.district} إلى ${nextRoleName}`, muniId);
     } else if (act === 'fine') {
       v.status = 'fined';
-      STATE.stats.violationsHandled += 1;
-      STATE.stats.generalBudget += v.fineAmount; STATE.stats.operatingRevenue += v.fineAmount;
-      STATE.stats.citizenSatisfaction = clamp(STATE.stats.citizenSatisfaction + 2, 0, 100);
+      muni.stats.violationsHandled += 1;
+      STATE.generalBudget += v.fineAmount; STATE.operatingRevenue += v.fineAmount;
+      muni.stats.citizenSatisfaction = clamp(muni.stats.citizenSatisfaction + 2, 0, 100);
       playSound('fine');
       toast(`تم فرض غرامة (${v.fineAmount.toLocaleString('ar-OM')} ر.ع) ومعالجة المخالفة`, 'success', '💵');
-      pushLog('💵', `${role.name} فرض غرامة ${v.fineAmount.toLocaleString('ar-OM')} ر.ع على مخالفة (${VIOLATION_LABELS[v.type]}) في ${v.district}`);
+      pushLog('💵', `${role.name} فرض غرامة ${v.fineAmount.toLocaleString('ar-OM')} ر.ع على مخالفة (${VIOLATION_LABELS[v.type]}) في ${v.district}`, muniId);
     } else if (act === 'dismiss') {
       v.status = 'dismissed';
       toast('تم تجاهل البلاغ', 'info', '🗂️');
-      pushLog('🗂️', `${role.name} أغلق بلاغ مخالفة دون إجراء في ${v.district}`);
+      pushLog('🗂️', `${role.name} أغلق بلاغ مخالفة دون إجراء في ${v.district}`, muniId);
     }
-    completeAnyViolationTask(role);
+    completeAnyViolationTask(role, muniId);
   }
 
   saveAndRerender();
 }
 
-function myPendingLicenseCount(roleId) {
-  return STATE.requests.filter(r => r.status === 'pending' && ESCALATION_STAGE_ROLE[r.currentLevel] === roleId).length;
+/* عدد الطلبات/المخالفات المعلقة التي تخص دورًا معينًا داخل مديرية بعينها (أو عبر كل المديريات لرئيس البلدية) */
+function myPendingLicenseCount(roleId, muniId = null) {
+  if (roleId === 'chairman') {
+    let total = 0;
+    MUNICIPALITIES.forEach(m => {
+      total += STATE.municipalities[m.id].requests.filter(r => r.status === 'pending' && ESCALATION_STAGE_ROLE[r.currentLevel] === 'chairman').length;
+    });
+    return total;
+  }
+  const muni = STATE.municipalities[muniId];
+  if (!muni) return 0;
+  return muni.requests.filter(r => r.status === 'pending' && ESCALATION_STAGE_ROLE[r.currentLevel] === roleId).length;
 }
-function myPendingViolationCount(roleId) {
-  return STATE.violations.filter(v => v.status === 'pending' && ESCALATION_STAGE_ROLE[v.currentLevel] === roleId).length;
+function myPendingViolationCount(roleId, muniId = null) {
+  if (roleId === 'chairman') {
+    let total = 0;
+    MUNICIPALITIES.forEach(m => {
+      total += STATE.municipalities[m.id].violations.filter(v => v.status === 'pending' && ESCALATION_STAGE_ROLE[v.currentLevel] === 'chairman').length;
+    });
+    return total;
+  }
+  const muni = STATE.municipalities[muniId];
+  if (!muni) return 0;
+  return muni.violations.filter(v => v.status === 'pending' && ESCALATION_STAGE_ROLE[v.currentLevel] === roleId).length;
 }
 
-function completeAnyLicenseTask(role) {
-  const list = STATE.tasks[role.id] || [];
-  const stillPending = myPendingLicenseCount(role.id) > 0;
+function completeAnyLicenseTask(role, muniId = null) {
+  const targetMuniId = muniId || STATE.municipality;
+  const list = role.id === 'chairman' ? (STATE.chairmanTasks || []) : ((STATE.municipalities[targetMuniId] || {}).tasks || {})[role.id] || [];
+  const stillPending = myPendingLicenseCount(role.id, targetMuniId) > 0;
   list.filter(x => x.kind === 'approve_license').forEach(t => { t.done = !stillPending; });
 }
-function completeAnyViolationTask(role) {
-  const list = STATE.tasks[role.id] || [];
-  const stillPending = myPendingViolationCount(role.id) > 0;
+function completeAnyViolationTask(role, muniId = null) {
+  const targetMuniId = muniId || STATE.municipality;
+  const list = role.id === 'chairman' ? (STATE.chairmanTasks || []) : ((STATE.municipalities[targetMuniId] || {}).tasks || {})[role.id] || [];
+  const stillPending = myPendingViolationCount(role.id, targetMuniId) > 0;
   list.filter(x => x.kind === 'handle_violation').forEach(t => { t.done = !stillPending; });
 }
 
 /* ---------- تبويب: المدينة (نظرة عامة + تعليمات وضع العناصر) ---------- */
 function renderCityPane() {
   const pane = document.getElementById('cityPane');
-  const s = STATE.stats;
+  const role = currentRole();
+
+  if (role.id === 'chairman') {
+    let rows = '';
+    MUNICIPALITIES.forEach(m => {
+      const s = STATE.municipalities[m.id].stats;
+      rows += `
+        <div class="task-card" style="cursor:default;">
+          <div class="tc-title">${m.icon} ${m.name}</div>
+          <div class="tc-meta">
+            <span>🌳 ${s.trees}</span><span>🌿 ${s.parks}</span><span>🛣️ ${s.roadsKm} كم</span><span>😊 ${s.citizenSatisfaction}%</span>
+          </div>
+        </div>`;
+    });
+    pane.innerHTML = `
+      <div class="section-title"><span class="dot"></span>الميزانية العمومية</div>
+      <div class="empty-state" style="padding:10px 4px; text-align:right; line-height:1.9;">
+        💰 <b style="color:var(--navy);">${STATE.generalBudget.toLocaleString('ar-OM')} ر.ع</b> متاحة حاليًا للتوجيه
+        <br><span style="font-size:10.5px; color:#aaa;">إيرادات تشغيلية تراكمية من كل المديريات: ${STATE.operatingRevenue.toLocaleString('ar-OM')} ر.ع</span>
+      </div>
+
+      <div class="section-title"><span class="dot"></span>مؤشرات كل مديرية</div>
+      ${rows}
+
+      <div class="section-title"><span class="dot"></span>كيف توجّه تمويلًا؟</div>
+      <div class="empty-state" style="padding:14px 4px; text-align:right; line-height:2;">
+        افتح مهمة "توجيه تمويل" من تبويب <b>"مهامي"</b>، اختر المديرية المستفيدة وعدد الوحدات، وسيُخصم المبلغ من الميزانية العمومية.
+        بعدها يقوم موظفو تلك المديرية بتنفيذ المشروع ميدانيًا على خريطتها.
+      </div>
+    `;
+    return;
+  }
+
+  const muni = currentMuniState();
+  const s = muni.stats;
   pane.innerHTML = `
-    <div class="section-title"><span class="dot"></span>مؤشرات تنمية المحافظة</div>
+    <div class="section-title"><span class="dot"></span>مؤشرات تنمية ${currentMunicipalityName()}</div>
     <div class="overview-grid">
       <div class="ov-card"><div class="ov-val">${s.trees}</div><div class="ov-lbl">أشجار مزروعة</div></div>
       <div class="ov-card"><div class="ov-val">${s.parks}</div><div class="ov-lbl">حدائق عامة</div></div>
@@ -1704,23 +1973,22 @@ function renderCityPane() {
 
     <div class="section-title"><span class="dot"></span>الميزانية العمومية</div>
     <div class="empty-state" style="padding:10px 4px; text-align:right; line-height:1.9;">
-      💰 <b style="color:var(--navy);">${s.generalBudget.toLocaleString('ar-OM')} ر.ع</b> متاحة حاليًا للتوجيه من رئيس البلدية
-      <br><span style="font-size:10.5px; color:#aaa;">إيرادات تشغيلية تراكمية من الرسوم والغرامات: ${s.operatingRevenue.toLocaleString('ar-OM')} ر.ع</span>
+      💰 <b style="color:var(--navy);">${STATE.generalBudget.toLocaleString('ar-OM')} ر.ع</b> متاحة على مستوى البلدية (يوجّهها رئيس البلدية)
     </div>
 
-    ${renderProjectsList()}
+    ${renderProjectsList(muni)}
 
     <div class="section-title"><span class="dot"></span>كيف تضيف عنصرًا للمدينة؟</div>
     <div class="empty-state" style="padding:14px 4px; text-align:right; line-height:2;">
-      يوجّه <b>رئيس البلدية</b> تمويلًا لمشروع (تشجير، حديقة، رصف طرق...) من الميزانية العمومية،
-      ثم ينفّذه المهندس المختص باختيار الموقع مباشرة على الخريطة. النتيجة تظهر فورًا كعلامة على خريطة مسقط.
+      يوجّه <b>رئيس البلدية</b> تمويلًا لمشروع (تشجير، حديقة، رصف طرق...) من الميزانية العمومية لهذه المديرية،
+      ثم ينفّذه الموظف المختص باختيار الموقع مباشرة على الخريطة. النتيجة تظهر فورًا كعلامة على الخريطة.
     </div>
     ${PENDING_PLACEMENT ? `<div class="badge urgent" style="display:block; text-align:center; padding:8px;">وضع التنفيذ نشط — اضغط على الخريطة الآن</div>` : ''}
   `;
 }
 
-function renderProjectsList() {
-  const funded = STATE.projects.filter(p => p.status === 'funded');
+function renderProjectsList(muni) {
+  const funded = muni.projects.filter(p => p.status === 'funded');
   if (funded.length === 0) return '';
   let html = `<div class="section-title"><span class="dot"></span>مشاريع ممولة بانتظار التنفيذ</div>`;
   funded.forEach(p => {
@@ -1729,7 +1997,7 @@ function renderProjectsList() {
       <div class="task-card" style="cursor:default; border-right-color:var(--gold);">
         <div class="tc-title">${pt.icon} ${pt.name}</div>
         <div class="tc-meta"><span>${p.units} ${pt.unit}</span><span>موّله: ${p.fundedBy}</span></div>
-        <div class="badge gold" style="margin-top:6px;">بانتظار التنفيذ الهندسي</div>
+        <div class="badge gold" style="margin-top:6px;">بانتظار التنفيذ الميداني</div>
       </div>
     `;
   });
@@ -1739,12 +2007,14 @@ function renderProjectsList() {
 /* ---------- تبويب: السجل ---------- */
 function renderLogPane() {
   const pane = document.getElementById('logPane');
-  if (STATE.log.length === 0) {
+  const role = currentRole();
+  const log = role.id === 'chairman' ? (STATE.chairmanLog || []) : (currentMuniState() ? currentMuniState().log : []);
+  if (log.length === 0) {
     pane.innerHTML = `<div class="empty-state">لا توجد أحداث مسجلة بعد. ابدأ بتنفيذ مهامك!</div>`;
     return;
   }
   pane.innerHTML = `<div class="section-title"><span class="dot"></span>سجل الأحداث</div>`;
-  STATE.log.forEach(l => {
+  log.forEach(l => {
     const div = document.createElement('div');
     div.className = 'log-item';
     div.innerHTML = `<span class="li-icon">${l.icon}</span><span>${l.text}<span class="li-time">${l.time}</span></span>`;
@@ -1753,15 +2023,22 @@ function renderLogPane() {
 }
 
 function syncApprovalTasks() {
-  // يعيد ضبط حالة مهام "approve_license"/"handle_violation" فقط لأدوار سلسلة التصعيد
-  // (مدير الدائرة، المدير العام، رئيس البلدية) بحسب ما هو فعليًا بانتظارهم الآن
-  ['director', 'general_director', 'chairman'].forEach(roleId => {
-    if (STATE.tasks[roleId]) {
-      const role = ROLES.find(r => r.id === roleId);
-      completeAnyLicenseTask(role);
-      completeAnyViolationTask(role);
-    }
+  // مزامنة مهام مدير الدائرة والمدير العام داخل كل مديرية على حدة
+  MUNICIPALITIES.forEach(m => {
+    const muni = STATE.municipalities[m.id];
+    ['director', 'general_director'].forEach(roleId => {
+      if (muni.tasks[roleId]) {
+        const role = MUNICIPALITY_ROLES.find(r => r.id === roleId);
+        completeAnyLicenseTask(role, m.id);
+        completeAnyViolationTask(role, m.id);
+      }
+    });
   });
+  // مزامنة مهام رئيس البلدية عبر كل المديريات مجتمعة
+  if (STATE.chairmanTasks && STATE.chairmanTasks.length) {
+    completeAnyLicenseTask(CHAIRMAN_ROLE);
+    completeAnyViolationTask(CHAIRMAN_ROLE);
+  }
 }
 
 function renderAll() {
@@ -1799,8 +2076,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('gameScreen').classList.add('hidden');
     document.getElementById('startScreen').classList.remove('hidden');
     SELECTED_ROLE_ID = null;
+    SELECTED_MUNI_ID = null;
     document.getElementById('startBtn').disabled = true;
     document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('jobStep').classList.add('hidden');
+    document.getElementById('scopeStep').classList.remove('hidden');
+  });
+
+  document.getElementById('backToScopeBtn').addEventListener('click', () => {
+    SELECTED_ROLE_ID = null;
+    SELECTED_MUNI_ID = null;
+    document.getElementById('startBtn').disabled = true;
+    document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('jobStep').classList.add('hidden');
+    document.getElementById('scopeStep').classList.remove('hidden');
   });
 
   document.getElementById('logBtn').addEventListener('click', () => {
