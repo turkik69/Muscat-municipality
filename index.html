@@ -672,11 +672,53 @@ const MUNICIPALITY_ROLES = [
     canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 1,
   },
   {
-    id: 'employee', tier: 'eng', icon: '👷', name: 'موظف',
-    desc: 'ينفذ المهام الميدانية اليومية في المديرية: زراعة، رصف، صيانة، رصد ميداني، ومتابعة الطلبات',
-    approvalLevel: 0, canIssueDirectives: false, canFineViolations: true,
-    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0,
+    id: 'emp_architect', tier: 'eng', icon: '📐', name: 'مهندس معماري',
+    desc: 'ينفذ مشاريع الحدائق العامة المموَّلة داخل المديرية',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0, specialty: 'park',
   },
+  {
+    id: 'emp_structural', tier: 'eng', icon: '🏗️', name: 'مهندس إنشائي',
+    desc: 'يراجع السلامة الإنشائية للمباني والمشاريع داخل المديرية',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 0, specialty: 'structural_review',
+  },
+  {
+    id: 'emp_roads', tier: 'eng', icon: '🛣️', name: 'مهندس طرق',
+    desc: 'ينفذ مشاريع رصف الطرق وصيانتها المموَّلة داخل المديرية',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0, specialty: 'road',
+  },
+  {
+    id: 'emp_landscape', tier: 'eng', icon: '🌳', name: 'مهندس زراعي / بيئي',
+    desc: 'ينفذ مشاريع زراعة الأشجار وتشجير الأحياء المموَّلة داخل المديرية',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0, specialty: 'tree',
+  },
+  {
+    id: 'emp_cleaning', tier: 'eng', icon: '♻️', name: 'مهندس نظافة',
+    desc: 'ينفذ مشاريع نقاط تجميع النفايات ويتابع بلاغات النظافة داخل المديرية',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: true, canAllocateBudget: false, budgetAuthority: 0, specialty: 'waste_point',
+  },
+  {
+    id: 'emp_building_inspector', tier: 'eng', icon: '🕵️', name: 'مفتش مباني',
+    desc: 'يرصد مخالفات البناء الميدانية (بناء بدون ترخيص) داخل المديرية',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 0, specialty: 'unlicensed',
+  },
+  {
+    id: 'emp_health_inspector', tier: 'eng', icon: '🩺', name: 'مفتش صحي',
+    desc: 'يرصد مخالفات النظافة ومخلفات البناء الميدانية داخل المديرية',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 0, specialty: 'sanitation',
+  },
+];
+
+/* الأدوار الميدانية السبعة التي تندرج تحت تصنيف "الموظف" (لأغراض العرض والتجميع فقط) */
+const FIELD_EMPLOYEE_ROLE_IDS = [
+  'emp_architect', 'emp_structural', 'emp_roads', 'emp_landscape',
+  'emp_cleaning', 'emp_building_inspector', 'emp_health_inspector',
 ];
 
 /* ---------- دور رئيس البلدية (مستقل، فوق كل المديريات) ---------- */
@@ -1065,15 +1107,34 @@ function taskTemplatesFor(roleId) {
       { id: 't_sh_2', title: 'جدولة المهام اليومية للفريق', kind: 'handle_violation', desc: 'وزّع المهام الميدانية اليومية على الفريق.' },
       { id: 't_sh_3', title: 'إسناد شكوى مواطن لموظف تنفيذي', kind: 'handle_complaint', desc: 'اختر الموظف المناسب وأسند إليه تنفيذ حل الشكوى ميدانيًا.' },
     ],
-    employee: [
-      { id: 't_emp_1', title: 'رصد مخالفة بناء بدون ترخيص', kind: 'create_violation', vtype: 'unlicensed', desc: 'اختر موقعًا على الخريطة داخل حي سكني وسجّل مخالفة بناء بدون ترخيص.' },
-      { id: 't_emp_2', title: 'رصد مخلفات بناء متروكة', kind: 'create_violation', vtype: 'debris', desc: 'اختر موقعًا وسجّل مخالفة ترك مخلفات بناء في الموقع.' },
-      { id: 't_emp_3', title: 'رصد رمي نفايات في الطريق العام', kind: 'create_violation', vtype: 'litter', desc: 'اختر موقعًا على طريق عام وسجّل مخالفة رمي مخلفات.' },
-      { id: 't_emp_4', title: 'تنفيذ مشروع تشجير مموَّل', kind: 'build', btype: 'tree', desc: 'نفّذ مشروع تشجير معتمد التمويل على الموقع المحدد.' },
-      { id: 't_emp_5', title: 'تنفيذ مشروع رصف طريق مموَّل', kind: 'build', btype: 'road', desc: 'نفّذ مشروع رصف طريق معتمد التمويل على الموقع المحدد.' },
-      { id: 't_emp_6', title: 'تنفيذ مشروع حديقة عامة مموَّل', kind: 'build', btype: 'park', desc: 'نفّذ مشروع حديقة معتمد التمويل من رئاسة البلدية على الموقع المحدد.' },
-      { id: 't_emp_7', title: 'تنفيذ مشروع نقطة تجميع نفايات', kind: 'build', btype: 'waste_point', desc: 'نفّذ مشروع نقطة تجميع نفايات معتمد التمويل.' },
-      { id: 't_emp_8', title: 'تنفيذ حل شكوى مواطن ميدانيًا', kind: 'handle_complaint', desc: 'نفّذ الحل الميداني للشكوى المُسندة إليك (نظافة/صيانة/طريق) على الموقع المحدد.' },
+    emp_architect: [
+      { id: 't_ea_1', title: 'تنفيذ مشروع حديقة عامة مموَّل', kind: 'build', btype: 'park', desc: 'نفّذ مشروع حديقة معتمد التمويل من رئاسة البلدية على الموقع المحدد.' },
+      { id: 't_ea_2', title: 'تنفيذ حل شكوى مواطن ميدانيًا', kind: 'handle_complaint', desc: 'نفّذ الحل الميداني للشكوى المُسندة إليك على الموقع المحدد.' },
+    ],
+    emp_structural: [
+      { id: 't_es_1', title: 'مراجعة السلامة الإنشائية لمشروع', kind: 'approve_license', desc: 'تحقق من السلامة الإنشائية للمخططات المرتبطة بمشاريع المديرية.' },
+      { id: 't_es_2', title: 'تنفيذ حل شكوى مواطن ميدانيًا', kind: 'handle_complaint', desc: 'نفّذ الحل الميداني للشكوى المُسندة إليك على الموقع المحدد.' },
+    ],
+    emp_roads: [
+      { id: 't_er_1', title: 'تنفيذ مشروع رصف طريق مموَّل', kind: 'build', btype: 'road', desc: 'نفّذ مشروع رصف طريق معتمد التمويل على الموقع المحدد.' },
+      { id: 't_er_2', title: 'صيانة طريق متضرر', kind: 'build', btype: 'road', desc: 'نفّذ مشروع صيانة طريق معتمد التمويل على الموقع المحدد.' },
+      { id: 't_er_3', title: 'تنفيذ حل شكوى معالجة طريق', kind: 'handle_complaint', desc: 'نفّذ الحل الميداني لشكوى معالجة طريق مُسندة إليك.' },
+    ],
+    emp_landscape: [
+      { id: 't_el_1', title: 'تنفيذ مشروع تشجير مموَّل', kind: 'build', btype: 'tree', desc: 'نفّذ مشروع تشجير معتمد التمويل على الموقع المحدد.' },
+      { id: 't_el_2', title: 'تشجير حي سكني إضافي', kind: 'build', btype: 'tree', desc: 'نفّذ مشروع تشجير إضافي معتمد التمويل.' },
+    ],
+    emp_cleaning: [
+      { id: 't_ec_1', title: 'تنفيذ مشروع نقطة تجميع نفايات', kind: 'build', btype: 'waste_point', desc: 'نفّذ مشروع نقطة تجميع نفايات معتمد التمويل.' },
+      { id: 't_ec_2', title: 'تنفيذ حل شكوى نظافة', kind: 'handle_complaint', desc: 'نفّذ الحل الميداني لشكوى نظافة مُسندة إليك.' },
+    ],
+    emp_building_inspector: [
+      { id: 't_ebi_1', title: 'رصد مخالفة بناء بدون ترخيص', kind: 'create_violation', vtype: 'unlicensed', desc: 'اختر موقعًا على الخريطة داخل حي سكني وسجّل مخالفة بناء بدون ترخيص.' },
+      { id: 't_ebi_2', title: 'رصد مخلفات بناء متروكة', kind: 'create_violation', vtype: 'debris', desc: 'اختر موقعًا وسجّل مخالفة ترك مخلفات بناء في الموقع.' },
+    ],
+    emp_health_inspector: [
+      { id: 't_ehi_1', title: 'رصد رمي نفايات في الطريق العام', kind: 'create_violation', vtype: 'litter', desc: 'اختر موقعًا على طريق عام وسجّل مخالفة رمي مخلفات.' },
+      { id: 't_ehi_2', title: 'تنفيذ حل شكوى نظافة', kind: 'handle_complaint', desc: 'نفّذ الحل الميداني لشكوى نظافة مُسندة إليك.' },
     ],
     tech_general_director: [
       { id: 't_tgd_1', title: 'متابعة أداء دائرة تراخيص البناء', kind: 'directive', desc: 'راجع أداء الدائرة في معالجة معاملات المكاتب الاستشارية.' },
@@ -1180,20 +1241,31 @@ const VIOLATION_FINE_TABLE = {
    المسار: تصل لمدير عام المديرية أولًا -> يوجّهها لمدير الدائرة -> رئيس القسم -> الموظف (ينفذ الحل ميدانيًا).
    إذا تعذر حلها عند مستوى المدير العام (تتجاوز صلاحيته)، تُصعّد لرئيس البلدية. */
 const COMPLAINT_TYPES = {
-  cleaning: { label: 'شكوى نظافة', icon: '🧹', dept: 'control' },
-  maintenance: { label: 'طلب صيانة', icon: '🔧', dept: 'planning' },
-  road_repair: { label: 'معالجة طريق متضرر', icon: '🕳️', dept: 'planning' },
+  cleaning: { label: 'شكوى نظافة', icon: '🧹', dept: 'control', executorRole: 'emp_health_inspector' },
+  maintenance: { label: 'طلب صيانة', icon: '🔧', dept: 'planning', executorRole: 'emp_structural' },
+  road_repair: { label: 'معالجة طريق متضرر', icon: '🕳️', dept: 'planning', executorRole: 'emp_roads' },
 };
 
-/* مراحل تدفق الشكوى: 0 = عند المدير العام (استلام) | 1 = عند مدير الدائرة | 2 = عند رئيس القسم | 3 = عند الموظف (تنفيذ) | 4 = مُصعّدة لرئيس البلدية */
-const COMPLAINT_STAGE_ROLE = { 0: 'general_director', 1: 'director', 2: 'section_head', 3: 'employee', 4: 'chairman' };
+/* مراحل تدفق الشكوى: 0 = عند المدير العام (استلام) | 1 = عند مدير الدائرة | 2 = عند رئيس القسم | 3 = عند الموظف المختص (تنفيذ) | 4 = مُصعّدة لرئيس البلدية
+   ملاحظة: في المرحلة 3 يختلف الدور المسؤول باختلاف نوع الشكوى (انظر COMPLAINT_TYPES[type].executorRole) */
 const COMPLAINT_STAGE_LABEL = {
   0: { label: 'وصلت لمدير عام المديرية', badge: 'normal' },
   1: { label: 'مُوجَّهة لمدير الدائرة', badge: 'gold' },
   2: { label: 'مُوجَّهة لرئيس القسم', badge: 'gold' },
-  3: { label: 'مُسندة لموظف للتنفيذ', badge: 'gold' },
+  3: { label: 'مُسندة لموظف مختص للتنفيذ', badge: 'gold' },
   4: { label: 'مُصعّدة لرئيس البلدية', badge: 'urgent' },
 };
+
+/* إرجاع الدور المسؤول عن مرحلة معينة من شكوى (يعتمد على نوعها في المرحلة 3) */
+function complaintStageRole(complaint) {
+  const stage = complaint.stage;
+  if (stage === 0) return 'general_director';
+  if (stage === 1) return 'director';
+  if (stage === 2) return 'section_head';
+  if (stage === 3) return COMPLAINT_TYPES[complaint.type].executorRole;
+  if (stage === 4) return 'chairman';
+  return null;
+}
 
 /* ---------- معاملات المكاتب الاستشارية (المديرية العامة للشؤون الفنية) ----------
    المسار: تصل مباشرة لمدير دائرة تراخيص البناء بالرئاسة -> يوزّعها على المهندسين الثلاثة (معماري/إنشائي/خدمات)
@@ -1490,7 +1562,8 @@ function selectMunicipalityScope(muniId) {
 
   const jobGrid = document.getElementById('jobGrid');
   jobGrid.innerHTML = '';
-  MUNICIPALITY_ROLES.forEach(r => {
+
+  const buildCard = (r) => {
     const card = document.createElement('div');
     card.className = 'role-card';
     card.dataset.role = r.id;
@@ -1500,8 +1573,26 @@ function selectMunicipalityScope(muniId) {
       <div class="rc-desc">${r.desc}</div>
     `;
     card.addEventListener('click', () => selectJobRole(r.id));
-    jobGrid.appendChild(card);
-  });
+    return card;
+  };
+
+  const mgmtLabel = document.createElement('div');
+  mgmtLabel.className = 'tier-label';
+  mgmtLabel.textContent = 'الإدارة';
+  jobGrid.appendChild(mgmtLabel);
+  const mgmtGrid = document.createElement('div');
+  mgmtGrid.className = 'role-grid';
+  MUNICIPALITY_ROLES.filter(r => !FIELD_EMPLOYEE_ROLE_IDS.includes(r.id)).forEach(r => mgmtGrid.appendChild(buildCard(r)));
+  jobGrid.appendChild(mgmtGrid);
+
+  const fieldLabel = document.createElement('div');
+  fieldLabel.className = 'tier-label';
+  fieldLabel.textContent = 'الكوادر الميدانية المتخصصة';
+  jobGrid.appendChild(fieldLabel);
+  const fieldGrid = document.createElement('div');
+  fieldGrid.className = 'role-grid';
+  MUNICIPALITY_ROLES.filter(r => FIELD_EMPLOYEE_ROLE_IDS.includes(r.id)).forEach(r => fieldGrid.appendChild(buildCard(r)));
+  jobGrid.appendChild(fieldGrid);
 
   document.getElementById('scopeStep').classList.add('hidden');
   document.getElementById('jobStep').classList.remove('hidden');
@@ -1981,8 +2072,9 @@ function buildComplaintCard(c, role, muniId, muniName) {
   div.style.borderRightColor = 'var(--green)';
   const ct = COMPLAINT_TYPES[c.type];
   const stageInfo = COMPLAINT_STAGE_LABEL[c.stage];
-  const isMyDesk = COMPLAINT_STAGE_ROLE[c.stage] === role.id;
+  const isMyDesk = complaintStageRole(c) === role.id;
   const muniTag = role.id === 'chairman' ? ` · ${muniName}` : '';
+  const executorRoleName = MUNICIPALITY_ROLES.find(r => r.id === ct.executorRole).name;
 
   let actionsHtml = `<div class="badge ${stageInfo.badge}" style="margin-top:6px;">${stageInfo.label}</div>`;
 
@@ -2002,9 +2094,9 @@ function buildComplaintCard(c, role, muniId, muniName) {
     } else if (role.id === 'section_head') {
       actionsHtml = `
         <div class="btn-row" style="margin-top:8px;">
-          <button class="btn btn-primary btn-sm" data-comp-act="forward" data-id="${c.id}" data-muni="${muniId}">إسناد لموظف تنفيذي</button>
+          <button class="btn btn-primary btn-sm" data-comp-act="forward" data-id="${c.id}" data-muni="${muniId}">إسناد لـ${executorRoleName}</button>
         </div>`;
-    } else if (role.id === 'employee') {
+    } else if (role.id === ct.executorRole) {
       actionsHtml = `
         <div class="btn-row" style="margin-top:8px;">
           <button class="btn btn-approve btn-sm" data-comp-act="resolve" data-id="${c.id}" data-muni="${muniId}">تنفيذ الحل على الخريطة</button>
@@ -2020,6 +2112,7 @@ function buildComplaintCard(c, role, muniId, muniName) {
   div.innerHTML = `
     <div class="tc-title">${ct.icon} ${ct.label}${muniTag}</div>
     <div class="tc-meta"><span>${c.district}</span><span>مقدّمها: ${c.citizenName}</span></div>
+    ${c.stage === 3 ? `<div class="badge normal" style="margin-top:4px;">التخصص المطلوب: ${executorRoleName}</div>` : ''}
     ${actionsHtml}
   `;
   return div;
@@ -2161,7 +2254,7 @@ function handleComplaintAction(act, id, muniId) {
 
   if (act === 'forward') {
     c.stage += 1;
-    const nextRoleName = MUNICIPALITY_ROLES.find(r => r.id === COMPLAINT_STAGE_ROLE[c.stage]).name;
+    const nextRoleName = MUNICIPALITY_ROLES.find(r => r.id === complaintStageRole(c)).name;
     playSound('directive');
     toast(`تم توجيه الشكوى إلى ${nextRoleName}`, 'info', '📤');
     pushLog('📤', `${role.name} وجّه شكوى (${ct.label}) في ${c.district} إلى ${nextRoleName}`, muniId);
@@ -2172,8 +2265,9 @@ function handleComplaintAction(act, id, muniId) {
     pushLog('📤', `${role.name} صعّد شكوى (${ct.label}) في ${c.district} لرئيس البلدية لتعذر حلها بالمديرية`, muniId);
     pushChairmanLog('📤', `شكوى مُصعّدة (${ct.label}) من ${MUNICIPALITIES.find(m => m.id === muniId).name}`);
   } else if (act === 'resolve') {
-    // الموظف ينفذ الحل مباشرة على الخريطة بحركة وصوت مناسبين
-    showWorkFx(c.lat, c.lng, 'waste_point', () => {
+    // الموظف المختص ينفذ الحل مباشرة على الخريطة بحركة وصوت مناسبين لنوع الشكوى
+    const fxType = c.type === 'road_repair' ? 'road' : 'waste_point';
+    showWorkFx(c.lat, c.lng, fxType, () => {
       c.status = 'resolved';
       muni.stats.citizenSatisfaction = clamp(muni.stats.citizenSatisfaction + 3, 0, 100);
       muni.stats.devPoints += 2;
@@ -2201,13 +2295,13 @@ function myPendingComplaintCount(roleId, muniId = null) {
   if (roleId === 'chairman') {
     let total = 0;
     MUNICIPALITIES.forEach(m => {
-      total += STATE.municipalities[m.id].complaints.filter(c => c.status === 'pending' && COMPLAINT_STAGE_ROLE[c.stage] === 'chairman').length;
+      total += STATE.municipalities[m.id].complaints.filter(c => c.status === 'pending' && complaintStageRole(c) === 'chairman').length;
     });
     return total;
   }
   const muni = STATE.municipalities[muniId];
   if (!muni) return 0;
-  return muni.complaints.filter(c => c.status === 'pending' && COMPLAINT_STAGE_ROLE[c.stage] === roleId).length;
+  return muni.complaints.filter(c => c.status === 'pending' && complaintStageRole(c) === roleId).length;
 }
 
 function completeAnyComplaintTask(role, muniId = null) {
@@ -2559,7 +2653,7 @@ function syncApprovalTasks() {
       }
     });
     // مزامنة مهام الشكاوى لكل الأدوار الأربعة داخل المديرية
-    ['general_director', 'director', 'section_head', 'employee'].forEach(roleId => {
+    ['general_director', 'director', 'section_head', ...FIELD_EMPLOYEE_ROLE_IDS].forEach(roleId => {
       if (muni.tasks[roleId]) {
         const role = MUNICIPALITY_ROLES.find(r => r.id === roleId);
         completeAnyComplaintTask(role, m.id);
