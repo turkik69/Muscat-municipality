@@ -2,39 +2,84 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>بلدية المستقبل | مسقط - النسخة الواقعية</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>بلدية المستقبل - مسقط</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{--navy:#0F2A3D;--gold:#C8961E;--gold-light:#E0B84A;--green:#2D6A4F;--red:#B23A2E;--cream:#F5F0E6;--cream-dark:#E8DFC9}
-*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',sans-serif;height:100vh;overflow:hidden;background:var(--cream)}
-.screen{position:fixed;inset:0;display:flex;z-index:10}.hidden{display:none!important}
-#start{background:linear-gradient(180deg,#081A26,#0F2A3D);flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px;text-align:center}
-#start h1{color:#fff;font-size:40px;font-weight:900} #start .sub{color:var(--gold-light);letter-spacing:2px} .pitch{color:rgba(255,255,255,.7);font-size:13px;max-width:520px;line-height:1.8}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:560px}
-.card{background:rgba(255,255,255,.06);border:1.5px solid rgba(200,150,30,.25);border-radius:12px;padding:12px;cursor:pointer;text-align:right;transition:.15s}
-.card.selected{border-color:var(--gold);background:rgba(200,150,30,.18);transform:translateY(-2px)} .card b{color:#fff;font-size:13px;display:block} .card small{color:rgba(255,255,255,.5);font-size:11px}
-.go{background:linear-gradient(135deg,var(--gold),#A67C12);color:#081A26;border:none;padding:14px 42px;border-radius:12px;font-family:'Cairo';font-weight:800;font-size:17px;cursor:pointer;box-shadow:0 6px 20px rgba(200,150,30,.3);touch-action:manipulation}
-#game{flex-direction:column;background:var(--cream)}
-.top{height:58px;background:var(--navy);border-bottom:2px solid var(--gold);display:flex;align-items:center;padding:0 14px;gap:10px;color:#fff;flex-shrink:0}
-.chip{background:rgba(200,150,30,.15);border:1px solid var(--gold);color:var(--gold-light);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700}
-.stats{margin-right:auto;display:flex;gap:6px;flex-wrap:wrap} .st{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);padding:5px 10px;border-radius:8px;font-size:12px} .st b{color:var(--gold-light)}
-.main{flex:1;display:flex;overflow:hidden;position:relative} #map{flex:1}
-.sidebar{width:360px;background:#fff;border-right:2px solid var(--cream-dark);display:flex;flex-direction:column;box-shadow:-4px 0 15px rgba(0,0,0,.05)}
-.tabs{display:flex;background:var(--cream);border-bottom:1px solid var(--cream-dark)} .tab{flex:1;padding:11px;text-align:center;font-size:12px;font-weight:700;color:#8a8478;cursor:pointer;border-bottom:2.5px solid transparent} .tab.active{color:var(--navy);border-color:var(--gold);background:#fff}
-.content{flex:1;overflow-y:auto;padding:12px} .sec{font-size:12px;font-weight:800;color:var(--navy);margin:12px 0 6px;display:flex;gap:6px;align-items:center} .sec:first-child{margin-top:0} .dot{width:6px;height:6px;border-radius:50%;background:var(--gold)}
-.task{background:var(--cream);border:1px solid var(--cream-dark);border-right:4px solid var(--navy);border-radius:9px;padding:10px;margin-bottom:8px}
-.task.urgent{border-right-color:var(--red);background:#fdf2f1} .task b{font-size:13px} .task small{color:#888;font-size:11px;display:block;margin:3px 0}
-.badge{padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;display:inline-block} .urgent-b{background:#fdeceb;color:var(--red)} .normal-b{background:#eef4f0;color:var(--green)}
-.btn{width:100%;padding:8px;border:none;border-radius:8px;font-family:'Cairo';font-weight:700;font-size:12px;cursor:pointer;margin-top:6px} .btn-go{background:var(--green);color:#fff} .btn-take{background:var(--navy);color:#fff}
-#panel{position:absolute;bottom:16px;right:16px;left:376px;max-width:420px;background:#fff;border-radius:14px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.22);z-index:20;display:none} #panel.show{display:block}
-#toasts{position:fixed;top:70px;left:14px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none} .toast{background:var(--navy);color:#fff;padding:11px 14px;border-radius:10px;font-size:12px;font-weight:600;border-right:4px solid var(--gold);box-shadow:0 6px 18px rgba(0,0,0,.2);animation:in .3s}
-@keyframes in{from{transform:translateX(-20px);opacity:0}to{transform:none;opacity:1}}
-@media(max-width:760px){.sidebar{position:absolute;inset:0;z-index:30;display:none;width:100%} .sidebar.open{display:flex} #panel{left:14px}}
+body{margin:0;font-family:'Cairo',system-ui;height:100vh;overflow:hidden}
+#game{display:flex;flex-direction:column;height:100vh}
+.top{height:56px;background:#0F2A3D;color:#fff;display:flex;align-items:center;padding:0 14px;gap:10px;border-bottom:2px solid #C8961E}
+.top b{font-size:16px}.stat{background:rgba(255,255,255,.12);padding:4px 10px;border-radius:8px;font-size:12px} .stat b{color:#E0B84A}
+.wrap{flex:1;display:flex;overflow:hidden;position:relative}
+#map{flex:1}.side{width:320px;background:#fff;border-right:1px solid #ddd;display:flex;flex-direction:column}
+.tab{padding:10px;text-align:center;font-weight:700;font-size:13px;background:#F5F0E6}
+#list{flex:1;overflow:auto;padding:8px}
+.task{background:#F5F0E6;border-right:4px solid #0F2A3D;padding:8px;border-radius:8px;margin-bottom:8px}
+#panel{position:absolute;bottom:20px;right:20px;left:340px;max-width:380px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:1000;display:none}
+#panel.show{display:block}
+.btn{width:100%;padding:10px;border:none;border-radius:8px;font-weight:800;cursor:pointer;margin-top:8px;font-family:'Cairo'}
+.btn-take{background:#0F2A3D;color:#fff}.btn-go{background:#2D6A4F;color:#fff}
+#toast{position:fixed;top:70px;left:10px;z-index:2000;display:flex;flex-direction:column;gap:6px}
+.toast{background:#0F2A3D;color:#fff;padding:10px 14px;border-radius:8px;border-right:4px solid #C8961E;font-size:12px}
 </style>
 </head>
 <body>
-<div id="start" class="screen">
-<h1>بلدية المستقبل</h1><div class="sub">MUSCAT MUNICIPALITY SIM</div>
-<p class="pitch">النسخة الواقعية: الميزانية محدودة، السمعة تنزل مع التأخير، وبلاغات حقيقية من أحياء 
+<div id="game">
+<div class="top"><b>بلدية مسقط | بلدية المستقبل</b><div style="margin-right:auto;display:flex;gap:6px"><div class="stat">💰 <b id="m">55000</b></div><div class="stat">⭐ <b id="r">78%</b></div><div class="stat">📋 <b id="c">0</b></div></div></div>
+<div class="wrap">
+<div class="side"><div class="tab">المهام - اضغط على الخريطة</div><div id="list"><div style="color:#999;text-align:center;padding:20px;font-size:12px">اضغط على أي دبوس في الخريطة لاستلام مهمة</div></div></div>
+<div id="map"></div>
+<div id="panel"></div>
+</div>
+</div>
+<div id="toast"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let money=55000,rep=78,tasks=[],map;
+const AREAS=[
+{n:"السيب",lat:23.667,lng:58.182,iss:"تجمع مياه أمطار خطير",price:9000,pri:"عاجل"},
+{n:"بوشر",lat:23.563,lng:58.383,iss:"رصيف مشاة مكسر",price:3200,pri:"عادي"},
+{n:"بوشر الخوير",lat:23.59,lng:58.42,iss:"حفريات تسبب زحمة",price:7500,pri:"عاجل"},
+{n:"القرم",lat:23.62,lng:58.48,iss:"صيانة حديقة القرم",price:4500,pri:"عادي"},
+{n:"روي",lat:23.587,lng:58.545,iss:"حفرة خطيرة",price:8000,pri:"عاجل"},
+{n:"مطرح",lat:23.613,lng:58.565,iss:"تنظيم سوق مطرح",price:8500,pri:"عاجل"}
+];
+function init(){
+map=L.map('map',{zoomControl:false}).setView([23.60,58.38],11);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+L.control.zoom({position:'topleft'}).addTo(map);
+AREAS.forEach(a=>{
+let html=`<div style="background:#0F2A3D;color:#fff;border:2px solid #C8961E;padding:6px 12px;border-radius:20px;font-weight:800;font-size:12px;box-shadow:0 3px 10px rgba(0,0,0,.4);text-align:center;min-width:60px">📍<br>${a.n}</div>`;
+let ic=L.divIcon({html:html,className:'',iconSize:[70,50],iconAnchor:[35,25]});
+L.marker([a.lat,a.lng],{icon:ic}).addTo(map).on('click',()=>openTask(a));
+});
+}
+function openTask(a){
+let p=document.getElementById('panel');
+p.innerHTML=`<div style="display:flex;justify-content:space-between"><b style="color:#0F2A3D">📍 ${a.n}</b><span onclick="panel.classList.remove('show')" style="cursor:pointer;font-size:18px">✕</span></div>
+<div style="margin:8px 0;font-size:13px;line-height:1.7">المهمة: <b>${a.iss}</b><br>الأولوية: <span style="background:${a.pri=='عاجل'?'#fdeceb':'#eef4f0'};color:${a.pri=='عاجل'?'#B23A2E':'#2D6A4F'};padding:2px 8px;border-radius:10px;font-size:11px">${a.pri}</span> - المكافأة: <b style="color:#0F2A3D">${a.price} ر.ع</b></div>
+<button class="btn btn-take" onclick="take('${a.n}','${a.iss}',${a.price},'${a.pri}')">استلام المهمة</button>`;
+p.classList.add('show');
+}
+function take(n,iss,price,pri){
+if(tasks.length>=5){toast('عندك 5 مهام، خلصها أولاً');return}
+tasks.push({id:Date.now(),n,iss,price,pri});render();document.getElementById('panel').classList.remove('show');toast('تم استلام: '+iss);
+}
+function render(){
+document.getElementById('c').innerText=tasks.length;
+let l=document.getElementById('list');
+if(!tasks.length){l.innerHTML='<div style="color:#999;text-align:center;padding:20px;font-size:12px">🗺️ اضغط على الخريطة<br>6 بلاغات واقعية بانتظارك</div>';return}
+l.innerHTML='';tasks.forEach(t=>{
+l.innerHTML+=`<div class="task" style="border-right-color:${t.pri=='عاجل'?'#B23A2E':'#0F2A3D'}"><b>${t.iss}</b><small style="display:block;color:#666;font-size:11px">📍 ${t.n} - 💰 ${t.price}</small><button class="btn btn-go" onclick="done(${t.id})">إنهاء وإرسال الفريق 🚜</button></div>`;
+});
+}
+function done(id){
+let t=tasks.find(x=>x.id==id);let a=AREAS.find(x=>x.n==t.n);
+let fx=L.marker([a.lat,a.lng],{icon:L.divIcon({html:`<div style="background:#0F2A3D;color:#fff;padding:6px 12px;border-radius:20px;border:1px solid #C8961E;font-size:11px;font-weight:700">🚜👷 جاري التنفيذ...</div>`})}).addTo(map);
+setTimeout(()=>{map.removeLayer(fx);tasks=tasks.filter(x=>x.id!=id);money+=t.price;rep=Math.min(100,rep+3);document.getElementById('m').innerText=money.toLocaleString();document.getElementById('r').innerText=rep+'%';render();toast('تم الإنجاز +'+t.price+' ر.ع');},1200);
+}
+function toast(m){let w=document.getElementById('toast');let d=document.createElement('div');d.className='toast';d.innerText=m;w.appendChild(d);setTimeout(()=>d.remove(),3000)}
+init();
+</script>
+</body>
+</html>
