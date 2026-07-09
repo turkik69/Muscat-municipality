@@ -687,8 +687,55 @@ const CHAIRMAN_ROLE = {
   canBuildProjects: false, canAllocateBudget: true, budgetAuthority: 5,
 };
 
+/* ---------- المديرية العامة للشؤون الفنية (تتبع رئاسة البلدية مباشرة، مستقلة عن المديريات الست) ----------
+   تختص باعتماد معاملات المكاتب الاستشارية الجديدة (مخططات مباني ومشاريع) من الصفر:
+   مدير عام الشؤون الفنية -> مدير دائرة تراخيص البناء -> مهندسون مختصون (معماري/إنشائي/خدمات)
+   كل مهندس يدقق في مجاله ويعطي موافقته؛ بعد اكتمال كل التدقيقات تُعتمد المعاملة وتعود للمكتب الاستشاري. */
+const TECHNICAL_DIRECTORATE = {
+  id: 'technical', name: 'المديرية العامة للشؤون الفنية', icon: '🏢',
+};
+
+const TECHNICAL_ROLES = [
+  {
+    id: 'tech_general_director', tier: 'top', icon: '🎖️', name: 'مدير عام الشؤون الفنية',
+    desc: 'يشرف على مديرية تراخيص البناء والمهندسين المختصين، ويتابع اعتماد معاملات المكاتب الاستشارية الجديدة',
+    approvalLevel: 2, canIssueDirectives: true, canFineViolations: false,
+    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 4,
+  },
+  {
+    id: 'tech_licensing_director', tier: 'mid', icon: '📄', name: 'مدير دائرة تراخيص البناء',
+    desc: 'يستقبل معاملات المكاتب الاستشارية الجديدة ويوزّعها على المهندسين المختصين للتدقيق',
+    approvalLevel: 1, canIssueDirectives: true, canFineViolations: false,
+    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 2,
+  },
+  {
+    id: 'tech_architect', tier: 'eng', icon: '📐', name: 'مهندس معماري',
+    desc: 'يدقق الجانب المعماري لمخططات المعاملات الجديدة ويعطي موافقته المتخصصة',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 0, reviewDomain: 'architectural',
+  },
+  {
+    id: 'tech_structural', tier: 'eng', icon: '🏗️', name: 'مهندس إنشائي',
+    desc: 'يدقق السلامة الإنشائية لمخططات المعاملات الجديدة ويعطي موافقته المتخصصة',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 0, reviewDomain: 'structural',
+  },
+  {
+    id: 'tech_services', tier: 'eng', icon: '🔧', name: 'مهندس خدمات',
+    desc: 'يدقق ملاءمة الخدمات (كهرباء، مياه، صرف) لمخططات المعاملات الجديدة ويعطي موافقته المتخصصة',
+    approvalLevel: 0, canIssueDirectives: false, canFineViolations: false,
+    canBuildProjects: false, canAllocateBudget: false, budgetAuthority: 0, reviewDomain: 'services',
+  },
+];
+
+const REVIEW_DOMAINS = [
+  { id: 'architectural', name: 'التدقيق المعماري', icon: '📐', roleId: 'tech_architect' },
+  { id: 'structural', name: 'التدقيق الإنشائي', icon: '🏗️', roleId: 'tech_structural' },
+  { id: 'services', name: 'تدقيق الخدمات', icon: '🔧', roleId: 'tech_services' },
+];
+
 /* قائمة موحّدة لكل الأدوار الممكنة (تُستخدم في البحث بالمعرف عبر النظام) */
-const ROLES = [CHAIRMAN_ROLE, ...MUNICIPALITY_ROLES];
+const ROLES = [CHAIRMAN_ROLE, ...MUNICIPALITY_ROLES, ...TECHNICAL_ROLES];
 /* ---------- حالة اللعبة ---------- */
 const STORAGE_KEY = 'baladiya_mustaqbal_state_v1';
 
@@ -710,6 +757,7 @@ function freshMunicipalityState() {
     markers: [],
     requests: [],
     violations: [],
+    complaints: [],   // شكاوى/طلبات المواطنين (نظافة، صيانة، معالجة طرق...)
     projects: [],
     tasks: {},   // roleId -> [ {id, title, done, ...} ]
     log: [],
@@ -717,17 +765,26 @@ function freshMunicipalityState() {
   };
 }
 
+function freshTechnicalState() {
+  return {
+    applications: [],  // معاملات المكاتب الاستشارية الجديدة (مخططات مباني/مشاريع)
+    tasks: {},         // roleId -> [ {id, title, done, ...} ] لأدوار المديرية الفنية
+    log: [],
+  };
+}
+
 function freshState() {
   const municipalities = {};
   MUNICIPALITIES.forEach(m => { municipalities[m.id] = freshMunicipalityState(); });
   return {
-    role: null,          // معرف الوظيفة الحالية (chairman أو أحد أدوار MUNICIPALITY_ROLES)
-    municipality: null,  // معرف المديرية الحالية (null إذا كان الدور رئيس البلدية)
+    role: null,          // معرف الوظيفة الحالية (chairman أو أحد أدوار MUNICIPALITY_ROLES أو TECHNICAL_ROLES)
+    municipality: null,  // معرف المديرية الحالية (null إذا كان الدور رئيس البلدية أو من المديرية الفنية)
     generalBudget: 500000,     // الميزانية العمومية المركزية التي يوجهها رئيس البلدية فقط
     operatingRevenue: 0,       // إجمالي الإيرادات التشغيلية من كل المديريات (رسوم + غرامات)
     chairmanLog: [],            // سجل أحداث خاص برئيس البلدية (عابر لكل المديريات)
     chairmanTasks: [],          // مهام رئيس البلدية (مستقلة عن المديريات)
     municipalities,             // بيانات كل مديرية مستقلة بالكامل
+    technical: freshTechnicalState(), // بيانات المديرية العامة للشؤون الفنية
   };
 }
 
@@ -742,6 +799,7 @@ async function loadState() {
       STATE = Object.assign(fresh, saved);
       // دمج آمن لبيانات المديريات: أي مديرية جديدة أُضيفت للعبة لاحقًا تُهيّأ تلقائيًا
       STATE.municipalities = Object.assign({}, fresh.municipalities, saved.municipalities || {});
+      STATE.technical = Object.assign(fresh.technical, saved.technical || {});
     }
   } catch (e) {}
 }
@@ -988,6 +1046,7 @@ function taskTemplatesFor(roleId) {
     general_director: [
       { id: 't_gd_1', title: 'متابعة أداء الدوائر', kind: 'directive', desc: 'راجع تقارير الدوائر وتأكد من التزامها بالخطة.' },
       { id: 't_gd_2', title: 'البتّ في الطلبات المرفوعة من مدير الدائرة', kind: 'approve_license', desc: 'اعتمد الطلبات ضمن صلاحيتك، وارفع ما يتجاوزها لرئيس البلدية.' },
+      { id: 't_gd_3', title: 'استقبال وتوجيه شكاوى المواطنين', kind: 'handle_complaint', desc: 'استقبل شكاوى المواطنين (نظافة، صيانة، طرق) ووجّهها لمدير الدائرة المختص.' },
     ],
     director: [
       { id: 't_ds_1', title: 'متابعة الحضور والانضباط الوظيفي', kind: 'directive', dept: 'staff', desc: 'أصدر توجيهًا بشأن انضباط الفرق الميدانية.' },
@@ -999,10 +1058,12 @@ function taskTemplatesFor(roleId) {
       { id: 't_dcon_2', title: 'إصدار توجيه بحملة رقابية', kind: 'directive', dept: 'control', desc: 'وجّه فرق التفتيش لحملة رقابية على المخلفات.' },
       { id: 't_dr_1', title: 'مراجعة الالتزام بأنظمة استخدام الأراضي', kind: 'approve_license', dept: 'regulation', desc: 'تحقق من مطابقة الطلبات لأنظمة التنظيم العمراني وارفعها للمدير العام.' },
       { id: 't_dr_2', title: 'رفع مخالفة تنظيمية للمدير العام', kind: 'handle_violation', dept: 'regulation', desc: 'راجع مخالفة متعلقة بمخالفة أنظمة البناء وارفعها للمدير العام.' },
+      { id: 't_dcx_1', title: 'توجيه شكوى مواطن لرئيس القسم', kind: 'handle_complaint', dept: 'planning', desc: 'راجع الشكوى الموجَّهة من المدير العام ووجّهها لرئيس القسم المختص.' },
     ],
     section_head: [
       { id: 't_sh_1', title: 'متابعة سير عمل الفريق اليومي', kind: 'approve_license', desc: 'راجع الطلبات الأولية قبل تصعيدها لمدير الدائرة.' },
       { id: 't_sh_2', title: 'جدولة المهام اليومية للفريق', kind: 'handle_violation', desc: 'وزّع المهام الميدانية اليومية على الفريق.' },
+      { id: 't_sh_3', title: 'إسناد شكوى مواطن لموظف تنفيذي', kind: 'handle_complaint', desc: 'اختر الموظف المناسب وأسند إليه تنفيذ حل الشكوى ميدانيًا.' },
     ],
     employee: [
       { id: 't_emp_1', title: 'رصد مخالفة بناء بدون ترخيص', kind: 'create_violation', vtype: 'unlicensed', desc: 'اختر موقعًا على الخريطة داخل حي سكني وسجّل مخالفة بناء بدون ترخيص.' },
@@ -1012,16 +1073,41 @@ function taskTemplatesFor(roleId) {
       { id: 't_emp_5', title: 'تنفيذ مشروع رصف طريق مموَّل', kind: 'build', btype: 'road', desc: 'نفّذ مشروع رصف طريق معتمد التمويل على الموقع المحدد.' },
       { id: 't_emp_6', title: 'تنفيذ مشروع حديقة عامة مموَّل', kind: 'build', btype: 'park', desc: 'نفّذ مشروع حديقة معتمد التمويل من رئاسة البلدية على الموقع المحدد.' },
       { id: 't_emp_7', title: 'تنفيذ مشروع نقطة تجميع نفايات', kind: 'build', btype: 'waste_point', desc: 'نفّذ مشروع نقطة تجميع نفايات معتمد التمويل.' },
+      { id: 't_emp_8', title: 'تنفيذ حل شكوى مواطن ميدانيًا', kind: 'handle_complaint', desc: 'نفّذ الحل الميداني للشكوى المُسندة إليك (نظافة/صيانة/طريق) على الموقع المحدد.' },
+    ],
+    tech_general_director: [
+      { id: 't_tgd_1', title: 'متابعة أداء دائرة تراخيص البناء', kind: 'directive', desc: 'راجع أداء الدائرة في معالجة معاملات المكاتب الاستشارية.' },
+      { id: 't_tgd_2', title: 'الاعتماد النهائي لمعاملة مكتملة التدقيق', kind: 'final_approve_application', desc: 'اعتمد نهائيًا معاملة أنهى المهندسون الثلاثة تدقيقهم عليها، لتعود للمكتب الاستشاري.' },
+    ],
+    tech_licensing_director: [
+      { id: 't_tld_1', title: 'توزيع معاملة جديدة على المهندسين المختصين', kind: 'distribute_application', desc: 'استقبل معاملة واردة من مكتب استشاري ووزّعها على المهندسين الثلاثة للتدقيق.' },
+    ],
+    tech_architect: [
+      { id: 't_tar_1', title: 'التدقيق المعماري لمعاملة', kind: 'review_application', domain: 'architectural', desc: 'دقّق الجانب المعماري للمخطط المُحال إليك وأعطِ موافقتك أو ملاحظاتك.' },
+    ],
+    tech_structural: [
+      { id: 't_tst_1', title: 'التدقيق الإنشائي لمعاملة', kind: 'review_application', domain: 'structural', desc: 'دقّق السلامة الإنشائية للمخطط المُحال إليك وأعطِ موافقتك أو ملاحظاتك.' },
+    ],
+    tech_services: [
+      { id: 't_tsv_1', title: 'تدقيق الخدمات لمعاملة', kind: 'review_application', domain: 'services', desc: 'دقّق ملاءمة الخدمات (كهرباء، مياه، صرف) للمخطط المُحال إليك وأعطِ موافقتك أو ملاحظاتك.' },
     ],
   };
   return T[roleId] || [];
 }
 
 /* ---------- تهيئة المهام عند اختيار دور لأول مرة ---------- */
+const TECHNICAL_ROLE_IDS = TECHNICAL_ROLES.map(r => r.id);
+
 function ensureTasksForRole(roleId) {
   if (roleId === 'chairman') {
     if (!STATE.chairmanTasks) {
       STATE.chairmanTasks = taskTemplatesFor(roleId).map(t => ({ ...t, done: false }));
+    }
+    return;
+  }
+  if (TECHNICAL_ROLE_IDS.includes(roleId)) {
+    if (!STATE.technical.tasks[roleId]) {
+      STATE.technical.tasks[roleId] = taskTemplatesFor(roleId).map(t => ({ ...t, done: false }));
     }
     return;
   }
@@ -1032,11 +1118,12 @@ function ensureTasksForRole(roleId) {
   }
 }
 
-/* إرجاع قائمة مهام الدور الحالي (تُفرّق بين رئيس البلدية وبقية الأدوار المرتبطة بمديرية) */
+/* إرجاع قائمة مهام الدور الحالي (تُفرّق بين رئيس البلدية، المديرية الفنية، وبقية الأدوار المرتبطة بمديرية) */
 function currentRoleTasks() {
   const role = currentRole();
   if (!role) return [];
   if (role.id === 'chairman') return STATE.chairmanTasks || [];
+  if (TECHNICAL_ROLE_IDS.includes(role.id)) return STATE.technical.tasks[role.id] || [];
   const muni = currentMuniState();
   return (muni && muni.tasks[role.id]) || [];
 }
@@ -1088,6 +1175,40 @@ const VIOLATION_FINE_TABLE = {
   debris:     { scale: 'medium', requiredLevel: 2, fineAmount: 800 },
   unlicensed: { scale: 'large',  requiredLevel: 3, fineAmount: 5000 },
 };
+
+/* ---------- شكاوى/طلبات المواطنين ----------
+   المسار: تصل لمدير عام المديرية أولًا -> يوجّهها لمدير الدائرة -> رئيس القسم -> الموظف (ينفذ الحل ميدانيًا).
+   إذا تعذر حلها عند مستوى المدير العام (تتجاوز صلاحيته)، تُصعّد لرئيس البلدية. */
+const COMPLAINT_TYPES = {
+  cleaning: { label: 'شكوى نظافة', icon: '🧹', dept: 'control' },
+  maintenance: { label: 'طلب صيانة', icon: '🔧', dept: 'planning' },
+  road_repair: { label: 'معالجة طريق متضرر', icon: '🕳️', dept: 'planning' },
+};
+
+/* مراحل تدفق الشكوى: 0 = عند المدير العام (استلام) | 1 = عند مدير الدائرة | 2 = عند رئيس القسم | 3 = عند الموظف (تنفيذ) | 4 = مُصعّدة لرئيس البلدية */
+const COMPLAINT_STAGE_ROLE = { 0: 'general_director', 1: 'director', 2: 'section_head', 3: 'employee', 4: 'chairman' };
+const COMPLAINT_STAGE_LABEL = {
+  0: { label: 'وصلت لمدير عام المديرية', badge: 'normal' },
+  1: { label: 'مُوجَّهة لمدير الدائرة', badge: 'gold' },
+  2: { label: 'مُوجَّهة لرئيس القسم', badge: 'gold' },
+  3: { label: 'مُسندة لموظف للتنفيذ', badge: 'gold' },
+  4: { label: 'مُصعّدة لرئيس البلدية', badge: 'urgent' },
+};
+
+/* ---------- معاملات المكاتب الاستشارية (المديرية العامة للشؤون الفنية) ----------
+   المسار: تصل مباشرة لمدير دائرة تراخيص البناء بالرئاسة -> يوزّعها على المهندسين الثلاثة (معماري/إنشائي/خدمات)
+   كل مهندس يوافق في مجاله -> بعد اكتمال الثلاث موافقات تُعتمد نهائيًا من مدير عام الشؤون الفنية وتعود للمكتب الاستشاري. */
+const CONSULTANCY_OFFICES = [
+  'مكتب الأمانة للاستشارات الهندسية',
+  'مكتب الرؤية المعمارية',
+  'مكتب الخليج للتصميم والإشراف',
+];
+
+const APPLICATION_PROJECT_TYPES = [
+  { label: 'مخطط فيلا سكنية', icon: '🏠' },
+  { label: 'مخطط مبنى تجاري', icon: '🏢' },
+  { label: 'مخطط مجمع سكني', icon: '🏘️' },
+];
 
 function initMap() {
   MAP = L.map('map', { zoomControl: true, attributionControl: true }).setView(MUSCAT_CENTER, MUSCAT_ZOOM);
@@ -1268,7 +1389,7 @@ function saveAndRerender() {
    ========================================================== */
 let SELECTED_MUNI_ID = null;   // null يعني اختيار رئيس البلدية
 let SELECTED_ROLE_ID = null;
-let SELECTING_CHAIRMAN = false;
+let SELECTED_SCOPE_TYPE = null; // 'chairman' | 'municipality' | 'technical'
 
 function currentRole() {
   return ROLES.find(r => r.id === STATE.role) || null;
@@ -1289,6 +1410,18 @@ function buildRoleSelectScreen() {
   chCard.addEventListener('click', () => selectChairmanScope());
   chairmanGrid.appendChild(chCard);
 
+  // بطاقة المديرية العامة للشؤون الفنية (تتبع الرئاسة، منفصلة عن المديريات الست)
+  const techCard = document.createElement('div');
+  techCard.className = 'role-card';
+  techCard.dataset.scope = 'technical';
+  techCard.innerHTML = `
+    <div class="rc-icon">${TECHNICAL_DIRECTORATE.icon}</div>
+    <div class="rc-name">${TECHNICAL_DIRECTORATE.name}</div>
+    <div class="rc-desc">اعتماد معاملات المكاتب الاستشارية الجديدة (مخططات مباني ومشاريع) قبل إحالتها لأي مديرية</div>
+  `;
+  techCard.addEventListener('click', () => selectTechnicalScope());
+  chairmanGrid.appendChild(techCard);
+
   // بطاقات المديريات الست
   const muniGrid = document.getElementById('municipalityGrid');
   muniGrid.innerHTML = '';
@@ -1307,7 +1440,7 @@ function buildRoleSelectScreen() {
 }
 
 function selectChairmanScope() {
-  SELECTING_CHAIRMAN = true;
+  SELECTED_SCOPE_TYPE = 'chairman';
   SELECTED_MUNI_ID = null;
   SELECTED_ROLE_ID = 'chairman';
   document.getElementById('startBtn').disabled = false;
@@ -1319,8 +1452,35 @@ function selectChairmanScope() {
   document.getElementById('scopeStep').classList.remove('hidden');
 }
 
+function selectTechnicalScope() {
+  SELECTED_SCOPE_TYPE = 'technical';
+  SELECTED_MUNI_ID = null;
+  SELECTED_ROLE_ID = null;
+  document.getElementById('startBtn').disabled = true;
+
+  document.getElementById('jobStepTitle').textContent = `اختر وظيفتك في ${TECHNICAL_DIRECTORATE.name}`;
+
+  const jobGrid = document.getElementById('jobGrid');
+  jobGrid.innerHTML = '';
+  TECHNICAL_ROLES.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'role-card';
+    card.dataset.role = r.id;
+    card.innerHTML = `
+      <div class="rc-icon">${r.icon}</div>
+      <div class="rc-name">${r.name}</div>
+      <div class="rc-desc">${r.desc}</div>
+    `;
+    card.addEventListener('click', () => selectJobRole(r.id));
+    jobGrid.appendChild(card);
+  });
+
+  document.getElementById('scopeStep').classList.add('hidden');
+  document.getElementById('jobStep').classList.remove('hidden');
+}
+
 function selectMunicipalityScope(muniId) {
-  SELECTING_CHAIRMAN = false;
+  SELECTED_SCOPE_TYPE = 'municipality';
   SELECTED_MUNI_ID = muniId;
   SELECTED_ROLE_ID = null;
   document.getElementById('startBtn').disabled = true;
@@ -1357,14 +1517,15 @@ function selectJobRole(roleId) {
 
 async function startGame() {
   if (!SELECTED_ROLE_ID) return;
-  if (SELECTED_ROLE_ID !== 'chairman' && !SELECTED_MUNI_ID) return;
+  if (SELECTED_SCOPE_TYPE === 'municipality' && !SELECTED_MUNI_ID) return;
 
   STATE.role = SELECTED_ROLE_ID;
-  STATE.municipality = SELECTED_ROLE_ID === 'chairman' ? null : SELECTED_MUNI_ID;
+  STATE.municipality = SELECTED_SCOPE_TYPE === 'municipality' ? SELECTED_MUNI_ID : null;
 
   ensureTasksForRole(STATE.role);
   const muni = currentMuniState();
   if (muni && !muni.seeded) seedInitialData();
+  if (TECHNICAL_ROLE_IDS.includes(STATE.role) && STATE.technical.applications.length === 0) seedTechnicalApplications();
   await saveState();
 
   document.getElementById('startScreen').classList.add('hidden');
@@ -1384,14 +1545,17 @@ async function startGame() {
 
   updateRoleChip();
   renderAll();
-  const scopeLabel = STATE.municipality ? currentMunicipalityName() : 'رئاسة البلدية';
+  const scopeLabel = STATE.municipality ? currentMunicipalityName() : (SELECTED_SCOPE_TYPE === 'technical' ? TECHNICAL_DIRECTORATE.name : 'رئاسة البلدية');
   pushLog(currentRole().icon, `${currentRole().name} بدأ مناوبة العمل في ${scopeLabel}`);
   saveAndRerender();
 }
 
 function updateRoleChip() {
   const r = currentRole();
-  const scopeLabel = STATE.municipality ? ` · ${currentMunicipalityName()}` : ' · رئاسة البلدية';
+  let scopeLabel;
+  if (STATE.municipality) scopeLabel = ` · ${currentMunicipalityName()}`;
+  else if (SELECTED_SCOPE_TYPE === 'technical' || TECHNICAL_ROLES.some(x => x.id === r.id)) scopeLabel = ` · ${TECHNICAL_DIRECTORATE.name}`;
+  else scopeLabel = ' · رئاسة البلدية';
   document.getElementById('currentRoleChip').textContent = `${r.icon} ${r.name}${scopeLabel}`;
 }
 
@@ -1449,7 +1613,49 @@ function seedInitialData() {
   });
   STATE.generalBudget -= 15 * PROJECT_TYPES.tree.unitCost;
 
+  // شكاوى مواطنين ابتدائية تصل مباشرة لمكتب المدير العام
+  const seedComplaints = [
+    { lat: midLat + qLat / 2, lng: midLng + qLng / 2, type: 'cleaning' },
+    { lat: midLat - qLat / 2, lng: midLng - qLng / 2, type: 'road_repair' },
+  ];
+  seedComplaints.forEach(sc => {
+    const ct = COMPLAINT_TYPES[sc.type];
+    const c = {
+      id: uid('comp'), lat: sc.lat, lng: sc.lng, district, type: sc.type,
+      status: 'pending', // pending -> resolved / escalated
+      stage: 0, // 0=مدير عام | 1=مدير دائرة | 2=رئيس قسم | 3=موظف | 4=رئيس البلدية
+      citizenName: 'مواطن من ' + district,
+      time: Date.now(),
+    };
+    muni.complaints.push(c);
+  });
+
   muni.seeded = true;
+}
+
+/* ---------- بيانات أولية لمعاملات المديرية العامة للشؤون الفنية ---------- */
+function seedTechnicalApplications() {
+  const seedApps = [
+    { office: CONSULTANCY_OFFICES[0], type: APPLICATION_PROJECT_TYPES[0], district: 'مديرية السيب' },
+    { office: CONSULTANCY_OFFICES[1], type: APPLICATION_PROJECT_TYPES[2], district: 'مديرية العامرات' },
+  ];
+  seedApps.forEach(sa => {
+    STATE.technical.applications.push({
+      id: uid('app'),
+      office: sa.office,
+      projectType: sa.type.label,
+      projectIcon: sa.type.icon,
+      district: sa.district,
+      status: 'pending', // pending -> approved
+      stage: 'received',  // received -> distributed -> final_review
+      reviews: {
+        architectural: { done: false, approved: false },
+        structural: { done: false, approved: false },
+        services: { done: false, approved: false },
+      },
+      time: Date.now(),
+    });
+  });
 }
 
 /* ---------- شريط الإحصائيات العلوي ---------- */
@@ -1473,6 +1679,16 @@ function renderStatsBar() {
       <div class="stat-pill"><span class="si">🌿</span> <b>${totalParks}</b></div>
       <div class="stat-pill"><span class="si">🛣️</span> <b>${totalRoads}</b> كم</div>
       <div class="stat-pill"><span class="si">😊</span> رضا (متوسط) <b>${avgSat}%</b></div>
+    `;
+    return;
+  }
+
+  if (TECHNICAL_ROLE_IDS.includes(role.id)) {
+    const pending = STATE.technical.applications.filter(a => a.status === 'pending').length;
+    const approved = STATE.technical.applications.filter(a => a.status === 'approved').length;
+    bar.innerHTML = `
+      <div class="stat-pill"><span class="si">📋</span> معاملات معلقة <b>${pending}</b></div>
+      <div class="stat-pill"><span class="si">✅</span> معتمدة <b>${approved}</b></div>
     `;
     return;
   }
@@ -1556,6 +1772,12 @@ function openTask(t) {
   } else if (t.kind === 'handle_violation') {
     document.querySelector('.stab[data-pane="reqPane"]').click();
     toast('راجع المخالفات المعلقة في تبويب "الطلبات"', 'info', '⚠️');
+  } else if (t.kind === 'handle_complaint') {
+    document.querySelector('.stab[data-pane="reqPane"]').click();
+    toast('راجع شكاوى المواطنين المعلقة في تبويب "الطلبات"', 'info', '🧹');
+  } else if (t.kind === 'distribute_application' || t.kind === 'review_application' || t.kind === 'final_approve_application') {
+    document.querySelector('.stab[data-pane="reqPane"]').click();
+    toast('راجع معاملات المكاتب الاستشارية في تبويب "الطلبات"', 'info', '📐');
   } else if (t.kind === 'directive') {
     completeTask(t.id);
     const muni = currentMuniState();
@@ -1689,6 +1911,22 @@ function renderReqPane() {
   const role = currentRole();
   pane.innerHTML = '';
 
+  if (TECHNICAL_ROLE_IDS.includes(role.id)) {
+    renderTechnicalApplicationsInto(pane, role);
+    return;
+  }
+
+  // شكاوى المواطنين
+  pane.innerHTML += `<div class="section-title"><span class="dot"></span>شكاوى وطلبات المواطنين</div>`;
+  const pendingComplaints = relevantPendingComplaints();
+  if (pendingComplaints.length === 0) {
+    pane.innerHTML += `<div class="empty-state">لا توجد شكاوى معلقة حاليًا.</div>`;
+  } else {
+    pendingComplaints.forEach(({ c, muniId, muniName }) => {
+      pane.appendChild(buildComplaintCard(c, role, muniId, muniName));
+    });
+  }
+
   // التراخيص
   pane.innerHTML += `<div class="section-title"><span class="dot"></span>طلبات تراخيص البناء</div>`;
   const pendingLic = relevantPendingLicenses();
@@ -1714,7 +1952,272 @@ function renderReqPane() {
   pane.querySelectorAll('button[data-act]').forEach(btn => {
     btn.addEventListener('click', () => handleReqAction(btn.dataset.act, btn.dataset.id, btn.dataset.kind, btn.dataset.muni));
   });
+  pane.querySelectorAll('button[data-comp-act]').forEach(btn => {
+    btn.addEventListener('click', () => handleComplaintAction(btn.dataset.compAct, btn.dataset.id, btn.dataset.muni));
+  });
 }
+
+/* ---------- شكاوى المواطنين: تجميع وعرض ---------- */
+function relevantPendingComplaints() {
+  const role = currentRole();
+  if (!role) return [];
+  if (role.id === 'chairman') {
+    const out = [];
+    MUNICIPALITIES.forEach(m => {
+      const muni = STATE.municipalities[m.id];
+      muni.complaints.filter(c => c.status === 'pending').forEach(c => out.push({ c, muniId: m.id, muniName: m.name }));
+    });
+    return out;
+  }
+  const muni = currentMuniState();
+  if (!muni) return [];
+  const muniDef = MUNICIPALITIES.find(m => m.id === STATE.municipality);
+  return muni.complaints.filter(c => c.status === 'pending').map(c => ({ c, muniId: STATE.municipality, muniName: muniDef.name }));
+}
+
+function buildComplaintCard(c, role, muniId, muniName) {
+  const div = document.createElement('div');
+  div.className = 'task-card';
+  div.style.borderRightColor = 'var(--green)';
+  const ct = COMPLAINT_TYPES[c.type];
+  const stageInfo = COMPLAINT_STAGE_LABEL[c.stage];
+  const isMyDesk = COMPLAINT_STAGE_ROLE[c.stage] === role.id;
+  const muniTag = role.id === 'chairman' ? ` · ${muniName}` : '';
+
+  let actionsHtml = `<div class="badge ${stageInfo.badge}" style="margin-top:6px;">${stageInfo.label}</div>`;
+
+  if (isMyDesk) {
+    if (role.id === 'general_director') {
+      actionsHtml = `
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-primary btn-sm" data-comp-act="forward" data-id="${c.id}" data-muni="${muniId}">توجيه لمدير الدائرة</button>
+          <button class="btn btn-primary btn-sm" data-comp-act="escalate" data-id="${c.id}" data-muni="${muniId}">تصعيد لرئيس البلدية</button>
+        </div>`;
+    } else if (role.id === 'director') {
+      actionsHtml = `
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-primary btn-sm" data-comp-act="forward" data-id="${c.id}" data-muni="${muniId}">توجيه لرئيس القسم</button>
+          <button class="btn btn-primary btn-sm" data-comp-act="escalate" data-id="${c.id}" data-muni="${muniId}">تصعيد لرئيس البلدية</button>
+        </div>`;
+    } else if (role.id === 'section_head') {
+      actionsHtml = `
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-primary btn-sm" data-comp-act="forward" data-id="${c.id}" data-muni="${muniId}">إسناد لموظف تنفيذي</button>
+        </div>`;
+    } else if (role.id === 'employee') {
+      actionsHtml = `
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-approve btn-sm" data-comp-act="resolve" data-id="${c.id}" data-muni="${muniId}">تنفيذ الحل على الخريطة</button>
+        </div>`;
+    } else if (role.id === 'chairman') {
+      actionsHtml = `
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-approve btn-sm" data-comp-act="resolve_directly" data-id="${c.id}" data-muni="${muniId}">توجيه حل مباشر</button>
+        </div>`;
+    }
+  }
+
+  div.innerHTML = `
+    <div class="tc-title">${ct.icon} ${ct.label}${muniTag}</div>
+    <div class="tc-meta"><span>${c.district}</span><span>مقدّمها: ${c.citizenName}</span></div>
+    ${actionsHtml}
+  `;
+  return div;
+}
+
+/* ---------- تبويب الطلبات لأدوار المديرية الفنية: معاملات المكاتب الاستشارية ---------- */
+function renderTechnicalApplicationsInto(pane, role) {
+  const tech = STATE.technical;
+  pane.innerHTML += `<div class="section-title"><span class="dot"></span>معاملات المكاتب الاستشارية</div>`;
+
+  const relevant = tech.applications.filter(a => a.status === 'pending' && isApplicationRelevantToRole(a, role));
+  if (relevant.length === 0) {
+    pane.innerHTML += `<div class="empty-state">لا توجد معاملات معلقة بانتظارك حاليًا.</div>`;
+  } else {
+    relevant.forEach(a => pane.appendChild(buildApplicationCard(a, role)));
+  }
+
+  pane.querySelectorAll('button[data-app-act]').forEach(btn => {
+    btn.addEventListener('click', () => handleApplicationAction(btn.dataset.appAct, btn.dataset.id, btn.dataset.domain));
+  });
+}
+
+function isApplicationRelevantToRole(a, role) {
+  if (role.id === 'tech_licensing_director') return a.status === 'pending' && a.stage === 'received';
+  if (role.id === 'tech_general_director') return a.status === 'pending' && a.stage === 'final_review';
+  if (REVIEW_DOMAINS.some(d => d.roleId === role.id)) {
+    const domain = REVIEW_DOMAINS.find(d => d.roleId === role.id).id;
+    return a.status === 'pending' && a.stage === 'distributed' && !a.reviews[domain].done;
+  }
+  return false;
+}
+
+function buildApplicationCard(a, role) {
+  const div = document.createElement('div');
+  div.className = 'task-card';
+  div.style.borderRightColor = 'var(--gold)';
+
+  let stageLabel = '—';
+  if (a.stage === 'received') stageLabel = 'واردة — بانتظار التوزيع على المهندسين';
+  else if (a.stage === 'distributed') {
+    const doneCount = REVIEW_DOMAINS.filter(d => a.reviews[d.id].done).length;
+    stageLabel = `قيد التدقيق (${doneCount}/3 موافقات)`;
+  } else if (a.stage === 'final_review') stageLabel = 'اكتمل التدقيق — بانتظار الاعتماد النهائي';
+
+  let actionsHtml = `<div class="badge gold" style="margin-top:6px;">${stageLabel}</div>`;
+
+  if (role.id === 'tech_licensing_director' && a.stage === 'received') {
+    actionsHtml = `
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-primary btn-sm" data-app-act="distribute" data-id="${a.id}">توزيع على المهندسين المختصين</button>
+      </div>`;
+  } else if (REVIEW_DOMAINS.some(d => d.roleId === role.id) && a.stage === 'distributed') {
+    const domain = REVIEW_DOMAINS.find(d => d.roleId === role.id).id;
+    if (!a.reviews[domain].done) {
+      actionsHtml = `
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-approve btn-sm" data-app-act="review_approve" data-id="${a.id}" data-domain="${domain}">إعطاء الموافقة</button>
+          <button class="btn btn-reject btn-sm" data-app-act="review_reject" data-id="${a.id}" data-domain="${domain}">طلب تعديل</button>
+        </div>`;
+    }
+  } else if (role.id === 'tech_general_director' && a.stage === 'final_review') {
+    actionsHtml = `
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-approve btn-sm" data-app-act="final_approve" data-id="${a.id}">اعتماد نهائي وإحالة للمكتب الاستشاري</button>
+      </div>`;
+  }
+
+  const reviewChips = REVIEW_DOMAINS.map(d => {
+    const rv = a.reviews[d.id];
+    const cls = rv.done ? (rv.approved ? 'normal' : 'urgent') : 'gold';
+    const label = rv.done ? (rv.approved ? 'معتمدة' : 'تحتاج تعديل') : 'بانتظار';
+    return `<span class="badge ${cls}" style="margin-inline-start:4px;">${d.icon} ${label}</span>`;
+  }).join('');
+
+  div.innerHTML = `
+    <div class="tc-title">${a.projectIcon} ${a.projectType}</div>
+    <div class="tc-meta"><span>${a.office}</span><span>${a.district}</span></div>
+    <div style="margin-top:6px;">${reviewChips}</div>
+    ${actionsHtml}
+  `;
+  return div;
+}
+
+function handleApplicationAction(act, id, domain) {
+  const role = currentRole();
+  const tech = STATE.technical;
+  const a = tech.applications.find(x => x.id === id);
+  if (!a) return;
+
+  if (act === 'distribute') {
+    a.stage = 'distributed';
+    playSound('directive');
+    toast('تم توزيع المعاملة على المهندسين المختصين', 'info', '📤');
+    pushTechnicalLog('📤', `${role.name} وزّع معاملة (${a.projectType}) من ${a.office} على المهندسين المختصين`);
+  } else if (act === 'review_approve' || act === 'review_reject') {
+    a.reviews[domain].done = true;
+    a.reviews[domain].approved = act === 'review_approve';
+    const domainInfo = REVIEW_DOMAINS.find(d => d.id === domain);
+    playSound(act === 'review_approve' ? 'license_approve' : 'license_reject');
+    toast(act === 'review_approve' ? `تم اعتماد ${domainInfo.name}` : `تم طلب تعديل على ${domainInfo.name}`, act === 'review_approve' ? 'success' : 'error', domainInfo.icon);
+    pushTechnicalLog(domainInfo.icon, `${role.name} ${act === 'review_approve' ? 'اعتمد' : 'طلب تعديلًا على'} ${domainInfo.name} لمعاملة (${a.projectType})`);
+
+    const allDone = REVIEW_DOMAINS.every(d => a.reviews[d.id].done);
+    if (allDone) {
+      const allApproved = REVIEW_DOMAINS.every(d => a.reviews[d.id].approved);
+      if (allApproved) {
+        a.stage = 'final_review';
+        pushTechnicalLog('📋', `اكتمل تدقيق كل المهندسين على معاملة (${a.projectType}) — بانتظار الاعتماد النهائي من المدير العام`);
+      } else {
+        // إذا أحد المهندسين طلب تعديل، تعود المعاملة لمرحلة التوزيع لإعادة النظر (تبسيطًا: تُصفّر المراجعات)
+        REVIEW_DOMAINS.forEach(d => { a.reviews[d.id] = { done: false, approved: false }; });
+        a.stage = 'received';
+        toast('طُلب تعديل — أُعيدت المعاملة لمدير دائرة التراخيص لإعادة التوزيع بعد التصحيح', 'error', '🔁');
+        pushTechnicalLog('🔁', `أُعيدت معاملة (${a.projectType}) لإعادة التدقيق بعد طلب تعديل`);
+      }
+    }
+  } else if (act === 'final_approve') {
+    a.status = 'approved';
+    playSound('license_approve');
+    toast(`تم الاعتماد النهائي وإحالة المعاملة إلى ${a.office}`, 'success', '✅');
+    pushTechnicalLog('✅', `${role.name} اعتمد نهائيًا معاملة (${a.projectType}) وأحالها إلى ${a.office}`);
+  }
+
+  saveAndRerender();
+}
+
+function pushTechnicalLog(icon, text) {
+  STATE.technical.log.unshift({ icon, text, time: new Date().toLocaleTimeString('ar-OM', { hour: '2-digit', minute: '2-digit' }) });
+  STATE.technical.log = STATE.technical.log.slice(0, 60);
+}
+
+function handleComplaintAction(act, id, muniId) {
+  const role = currentRole();
+  const muni = STATE.municipalities[muniId];
+  if (!muni) return;
+  const c = muni.complaints.find(x => x.id === id);
+  if (!c) return;
+  const ct = COMPLAINT_TYPES[c.type];
+
+  if (act === 'forward') {
+    c.stage += 1;
+    const nextRoleName = MUNICIPALITY_ROLES.find(r => r.id === COMPLAINT_STAGE_ROLE[c.stage]).name;
+    playSound('directive');
+    toast(`تم توجيه الشكوى إلى ${nextRoleName}`, 'info', '📤');
+    pushLog('📤', `${role.name} وجّه شكوى (${ct.label}) في ${c.district} إلى ${nextRoleName}`, muniId);
+  } else if (act === 'escalate') {
+    c.stage = 4; // مصعّدة لرئيس البلدية
+    playSound('directive');
+    toast('تم تصعيد الشكوى لرئيس البلدية', 'info', '📤');
+    pushLog('📤', `${role.name} صعّد شكوى (${ct.label}) في ${c.district} لرئيس البلدية لتعذر حلها بالمديرية`, muniId);
+    pushChairmanLog('📤', `شكوى مُصعّدة (${ct.label}) من ${MUNICIPALITIES.find(m => m.id === muniId).name}`);
+  } else if (act === 'resolve') {
+    // الموظف ينفذ الحل مباشرة على الخريطة بحركة وصوت مناسبين
+    showWorkFx(c.lat, c.lng, 'waste_point', () => {
+      c.status = 'resolved';
+      muni.stats.citizenSatisfaction = clamp(muni.stats.citizenSatisfaction + 3, 0, 100);
+      muni.stats.devPoints += 2;
+      playSound('license_approve');
+      toast(`تم تنفيذ حل الشكوى (${ct.label}) بنجاح`, 'success', '✅');
+      pushLog('✅', `${role.name} نفّذ حل شكوى (${ct.label}) في ${c.district}`, muniId);
+      completeAnyComplaintTask(role, muniId);
+      saveAndRerender();
+    });
+    return;
+  } else if (act === 'resolve_directly') {
+    c.status = 'resolved';
+    muni.stats.citizenSatisfaction = clamp(muni.stats.citizenSatisfaction + 2, 0, 100);
+    playSound('directive');
+    toast(`تم توجيه حل مباشر للشكوى (${ct.label})`, 'success', '✅');
+    pushLog('✅', `رئيس البلدية وجّه حلًا مباشرًا لشكوى (${ct.label}) في ${c.district}`, muniId);
+    pushChairmanLog('✅', `تم حل شكوى مُصعّدة (${ct.label}) من ${MUNICIPALITIES.find(m => m.id === muniId).name}`);
+  }
+
+  completeAnyComplaintTask(role, muniId);
+  saveAndRerender();
+}
+
+function myPendingComplaintCount(roleId, muniId = null) {
+  if (roleId === 'chairman') {
+    let total = 0;
+    MUNICIPALITIES.forEach(m => {
+      total += STATE.municipalities[m.id].complaints.filter(c => c.status === 'pending' && COMPLAINT_STAGE_ROLE[c.stage] === 'chairman').length;
+    });
+    return total;
+  }
+  const muni = STATE.municipalities[muniId];
+  if (!muni) return 0;
+  return muni.complaints.filter(c => c.status === 'pending' && COMPLAINT_STAGE_ROLE[c.stage] === roleId).length;
+}
+
+function completeAnyComplaintTask(role, muniId = null) {
+  const targetMuniId = muniId || STATE.municipality;
+  const list = role.id === 'chairman' ? (STATE.chairmanTasks || []) : ((STATE.municipalities[targetMuniId] || {}).tasks || {})[role.id] || [];
+  const stillPending = myPendingComplaintCount(role.id, targetMuniId) > 0;
+  list.filter(x => x.kind === 'handle_complaint').forEach(t => { t.done = !stillPending; });
+}
+
+
 
 const ESCALATION_STAGE_LABEL = {
   0: { label: 'على مكتب مدير الدائرة', badge: 'normal' },
@@ -1958,6 +2461,25 @@ function renderCityPane() {
     return;
   }
 
+  if (TECHNICAL_ROLE_IDS.includes(role.id)) {
+    const pending = STATE.technical.applications.filter(a => a.status === 'pending');
+    const approved = STATE.technical.applications.filter(a => a.status === 'approved');
+    pane.innerHTML = `
+      <div class="section-title"><span class="dot"></span>نظرة عامة على المعاملات</div>
+      <div class="overview-grid">
+        <div class="ov-card"><div class="ov-val">${pending.length}</div><div class="ov-lbl">معاملات قيد المعالجة</div></div>
+        <div class="ov-card"><div class="ov-val">${approved.length}</div><div class="ov-lbl">معاملات معتمدة</div></div>
+      </div>
+      <div class="section-title"><span class="dot"></span>عن المديرية العامة للشؤون الفنية</div>
+      <div class="empty-state" style="padding:14px 4px; text-align:right; line-height:2;">
+        هذه المديرية تتبع رئاسة البلدية مباشرة وتختص باعتماد معاملات المكاتب الاستشارية الجديدة
+        (مخططات المباني والمشاريع) قبل إحالتها لأي مديرية. المسار: مدير دائرة التراخيص يوزّع المعاملة على
+        المهندسين الثلاثة (معماري، إنشائي، خدمات)، وبعد اكتمال موافقاتهم يعتمدها مدير عام الشؤون الفنية نهائيًا.
+      </div>
+    `;
+    return;
+  }
+
   const muni = currentMuniState();
   const s = muni.stats;
   pane.innerHTML = `
@@ -2008,7 +2530,10 @@ function renderProjectsList(muni) {
 function renderLogPane() {
   const pane = document.getElementById('logPane');
   const role = currentRole();
-  const log = role.id === 'chairman' ? (STATE.chairmanLog || []) : (currentMuniState() ? currentMuniState().log : []);
+  let log;
+  if (role.id === 'chairman') log = STATE.chairmanLog || [];
+  else if (TECHNICAL_ROLE_IDS.includes(role.id)) log = STATE.technical.log || [];
+  else log = currentMuniState() ? currentMuniState().log : [];
   if (log.length === 0) {
     pane.innerHTML = `<div class="empty-state">لا توجد أحداث مسجلة بعد. ابدأ بتنفيذ مهامك!</div>`;
     return;
@@ -2023,7 +2548,7 @@ function renderLogPane() {
 }
 
 function syncApprovalTasks() {
-  // مزامنة مهام مدير الدائرة والمدير العام داخل كل مديرية على حدة
+  // مزامنة مهام مدير الدائرة والمدير العام داخل كل مديرية على حدة (تراخيص ومخالفات)
   MUNICIPALITIES.forEach(m => {
     const muni = STATE.municipalities[m.id];
     ['director', 'general_director'].forEach(roleId => {
@@ -2033,11 +2558,19 @@ function syncApprovalTasks() {
         completeAnyViolationTask(role, m.id);
       }
     });
+    // مزامنة مهام الشكاوى لكل الأدوار الأربعة داخل المديرية
+    ['general_director', 'director', 'section_head', 'employee'].forEach(roleId => {
+      if (muni.tasks[roleId]) {
+        const role = MUNICIPALITY_ROLES.find(r => r.id === roleId);
+        completeAnyComplaintTask(role, m.id);
+      }
+    });
   });
   // مزامنة مهام رئيس البلدية عبر كل المديريات مجتمعة
   if (STATE.chairmanTasks && STATE.chairmanTasks.length) {
     completeAnyLicenseTask(CHAIRMAN_ROLE);
     completeAnyViolationTask(CHAIRMAN_ROLE);
+    completeAnyComplaintTask(CHAIRMAN_ROLE);
   }
 }
 
