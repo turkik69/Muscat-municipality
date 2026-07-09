@@ -2,90 +2,106 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>بلدية المستقبل | مسقط</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800;900&display=swap" rel="stylesheet">
 <style>
-:root{
-  --navy:#0F2A3D; --navy-light:#1C4058; --navy-dark:#081A26;
-  --gold:#C8961E; --gold-light:#E0B84A; --green:#2D6A4F;
-  --green-light:#4E9270; --red:#B23A2E; --cream:#F5F0E6;
-  --cream-dark:#E8DFC9; --ink:#22262B;
-}
-*{box-sizing:border-box; margin:0; padding:0;}
-html,body{height:100%; overflow:hidden;}
-body{font-family:'Cairo', sans-serif; background:var(--cream); color:var(--ink); direction:rtl;}
-#app{width:100vw; height:100vh; position:relative;}
-.screen{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:50;}
-.hidden{display:none !important;}
-#startScreen{background: linear-gradient(180deg, rgba(8,26,38,.88) 0%, rgba(15,42,61,.93) 55%, rgba(8,26,38,.97) 100%), var(--navy-dark); flex-direction:column; gap:0; overflow-y:auto; padding:32px 16px;}
-.start-inner{max-width:900px; width:100%; display:flex; flex-direction:column; align-items:center; gap:22px;}
-.gov-strip{display:flex; align-items:center; gap:10px; color:var(--gold-light); font-size:12px; letter-spacing:.5px; opacity:.85;}
-.gov-strip::before, .gov-strip::after{content:''; width:34px; height:1px; background:var(--gold);}
-.logo-mark{width:104px; height:104px; border:2.5px solid var(--gold); border-radius:14px; display:flex; align-items:center; justify-content:center; position:relative; background:linear-gradient(160deg, rgba(200,150,30,.08), transparent); padding:12px;}
-.logo-mark svg{width:56px; height:56px;}
-.title-block{text-align:center;}
-.title-block h1{font-size:clamp(28px,6vw,44px); font-weight:900; color:#fff; letter-spacing:.5px;}
-.title-block .sub{color:var(--gold-light); font-size:15px; font-weight:600; margin-top:4px; letter-spacing:1px;}
-.title-block .en{color:rgba(255,255,255,.45); font-size:11px; letter-spacing:3px; margin-top:10px; text-transform:uppercase;}
-.pitch{color:rgba(255,255,255,.75); text-align:center; font-size:14px; line-height:1.9; max-width:560px;}
-.pitch b{color:var(--gold-light);}
-.role-select-title{color:#fff; font-size:16px; font-weight:700; margin-top:6px; display:flex; align-items:center; gap:8px;}
-.role-select-title::before{content:'▸'; color:var(--gold);}
-.role-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px; width:100%;}
-.role-card{background:rgba(255,255,255,.04); border:1px solid rgba(200,150,30,.25); border-radius:10px; padding:14px 12px; cursor:pointer; transition:.18s; display:flex; flex-direction:column; gap:6px; text-align:right;}
-.role-card:hover{background:rgba(200,150,30,.1); border-color:var(--gold); transform:translateY(-2px);}
-.role-card.selected{background:rgba(200,150,30,.16); border-color:var(--gold); box-shadow:0 0 0 1px var(--gold) inset;}
-.role-card .rc-icon{font-size:22px;} .role-card .rc-name{color:#fff; font-weight:700; font-size:13.5px;}
-.role-card .rc-tier{color:var(--gold-light); font-size:10.5px; font-weight:600;}
-.role-card .rc-desc{color:rgba(255,255,255,.5); font-size:10.5px; line-height:1.5;}
-.tier-label{color:rgba(255,255,255,.4); font-size:11px; font-weight:700; letter-spacing:1px; width:100%; text-align:right; margin-top:4px; display:flex; align-items:center; gap:8px;}
-.tier-label::after{content:''; flex:1; height:1px; background:rgba(255,255,255,.1);}
-.start-btn{margin-top:8px; background:linear-gradient(135deg, var(--gold) 0%, #B07E15 100%); color:var(--navy-dark); border:none; padding:14px 48px; border-radius:10px; font-family:'Cairo',sans-serif; font-weight:800; font-size:16px; cursor:pointer; transition:.15s; box-shadow:0 4px 20px rgba(200,150,30,.25);}
-.start-btn:hover:not(:disabled){transform:translateY(-2px); box-shadow:0 6px 24px rgba(200,150,30,.4);}
-.start-btn:disabled{opacity:.35; cursor:not-allowed;}
-#gameScreen{flex-direction:column; align-items:stretch; justify-content:flex-start;}
-.topbar{height:60px; min-height:60px; background:var(--navy); border-bottom:2px solid var(--gold); display:flex; align-items:center; padding:0 16px; gap:16px; z-index:20;}
-.topbar .brand{display:flex; align-items:center; gap:10px; color:#fff;}
-.topbar .brand .logo-mini{width:34px; height:34px; border:1.5px solid var(--gold); border-radius:8px; display:flex; align-items:center; justify-content:center;}
-.topbar .brand .logo-mini svg{width:20px; height:20px;}
-.topbar .brand-text{display:flex; flex-direction:column; line-height:1.2;}
-.topbar .brand-text b{font-size:14px;} .topbar .brand-text span{font-size:10px; color:var(--gold-light);}
-.topbar .role-chip{background:rgba(200,150,30,.15); border:1px solid var(--gold); color:var(--gold-light); padding:5px 14px; border-radius:20px; font-size:12.5px; font-weight:700;}
-.topbar .stats{display:flex; gap:8px; margin-right:auto; flex-wrap:wrap;}
-.stat-pill{display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); padding:6px 12px; border-radius:8px; color:#fff; font-size:12px;}
-.stat-pill .si{font-size:14px;} .stat-pill b{color:var(--gold-light); font-size:13px;}
-.icon-btn{background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:#fff; width:36px; height:36px; border-radius:8px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center; transition:.15s;}
-.icon-btn:hover{background:rgba(200,150,30,.2); border-color:var(--gold);}
-.main-area{flex:1; display:flex; overflow:hidden; position:relative;}
-#map{flex:1; height:100%; filter:saturate(.9);}
-.sidebar{width:360px; min-width:360px; background:#fff; border-right:2px solid var(--cream-dark); display:flex; flex-direction:column; overflow:hidden; box-shadow:-6px 0 20px rgba(0,0,0,.06);}
-.sidebar-tabs{display:flex; background:var(--cream); border-bottom:1px solid var(--cream-dark);}
-.stab{flex:1; padding:11px 4px; text-align:center; font-size:12px; font-weight:700; cursor:pointer; color:#8a8478; border-bottom:2.5px solid transparent; transition:.15s;}
-.stab.active{color:var(--navy); border-bottom-color:var(--gold); background:#fff;}
-.sidebar-content{flex:1; overflow-y:auto; padding:14px;}
-.sidebar-pane{display:none;} .sidebar-pane.active{display:block;}
-.section-title{font-size:13px; font-weight:800; color:var(--navy); margin:14px 0 8px; display:flex; align-items:center; gap:6px;}
-.section-title:first-child{margin-top:0;} .section-title .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);}
-.task-card{background:var(--cream); border:1px solid var(--cream-dark); border-right:4px solid var(--navy); border-radius:8px; padding:11px 12px; margin-bottom:8px; cursor:pointer; transition:.15s;}
-.task-card:hover{border-right-color:var(--gold); background:#fdfaf3;}
-.task-card.done{opacity:.5; border-right-color:var(--green);}
-.task-card .tc-title{font-size:13px; font-weight:700; color:var(--ink); margin-bottom:3px;}
-.task-card .tc-meta{font-size:10.5px; color:#8a8478; display:flex; gap:10px; flex-wrap:wrap;}
-.badge{display:inline-block; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700;}
-.badge.urgent{background:#fdeceb; color:var(--red);} .badge.normal{background:#eef4f0; color:var(--green);} .badge.gold{background:#fbf3e0; color:#96700f;}
-.empty-state{text-align:center; color:#aaa; font-size:12.5px; padding:30px 10px; line-height:1.8;}
-.btn{width:100%; padding:10px; border:none; border-radius:8px; font-family:'Cairo',sans-serif; font-weight:700; font-size:12.5px; cursor:pointer; transition:.15s; margin-top:8px;}
-.btn-primary{background:var(--navy); color:#fff;} .btn-primary:hover{background:var(--navy-light);}
-.btn-approve{background:var(--green); color:#fff;} .btn-approve:hover{background:var(--green-light);}
-.btn-reject{background:var(--red); color:#fff;} .btn-sm{padding:7px; font-size:11.5px; margin-top:6px;}
-.btn-row{display:flex; gap:6px;} .btn-row .btn{margin-top:0;}
-#toastWrap{position:absolute; top:74px; left:16px; z-index:60; display:flex; flex-direction:column; gap:8px; pointer-events:none;}
-.toast{background:var(--navy); color:#fff; padding:12px 16px; border-radius:10px; font-size:12.5px; font-weight:600; box-shadow:0 6px 20px rgba(0,0,0,.25); border-right:4px solid var(--gold); display:flex; align-items:center; gap:8px; min-width:220px; max-width:320px; animation:slideIn .3s ease, fadeOut .4s ease 3.6s forwards;}
-.toast.success{border-right-color:var(--green);} .toast.error{border-right-color:var(--red);}
-@keyframes slideIn{from{transform:translateX(-30px); opacity:0;} to{transform:translateX(0); opacity:1;}}
-@keyframes fadeOut{to{opacity:0; transform:translateX(-20px);}}
-.overview-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:6px;}
-.ov-card{background:var(--cream); border-radius:10px; padding:12px; text-align:center; border:1px solid var(--cream-dark);}
-.ov-card .ov-val{font-size:20px; font-weight:900; color:var(--navy);} .ov-card .ov-lbl{font-size:10.5px; color:#8a8478;
+:root{--navy:#0F2A3D;--gold:#C8961E;--gold-light:#E0B84A;--green:#2D6A4F;--red:#B23A2E;--cream:#F5F0E6;--cream-dark:#E8DFC9;}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Cairo',sans-serif;background:var(--cream);height:100vh;overflow:hidden}
+.screen{position:absolute;inset:0;display:flex;z-index:10}.hidden{display:none!important}
+#startScreen{background:linear-gradient(180deg,#081A26 0%,#0F2A3D 100%);flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:18px;overflow-y:auto}
+#startScreen h1{color:#fff;font-size:36px;font-weight:900}.sub{color:var(--gold-light)} .pitch{color:rgba(255,255,255,.7);text-align:center;max-width:500px;font-size:13px;line-height:1.8}
+.role-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;width:100%;max-width:600px}
+.role-card{background:rgba(255,255,255,.05);border:1px solid rgba(200,150,30,.3);border-radius:10px;padding:12px;cursor:pointer;text-align:right}
+.role-card.selected{border-color:var(--gold);background:rgba(200,150,30,.15)} .role-card b{color:#fff;font-size:13px;display:block} .role-card span{color:rgba(255,255,255,.5);font-size:11px}
+.start-btn{margin-top:10px;background:var(--gold);color:#081A26;border:none;padding:14px 40px;border-radius:10px;font-family:'Cairo';font-weight:800;font-size:16px;cursor:pointer}
+.start-btn:disabled{opacity:.3}
+#gameScreen{flex-direction:column}
+.topbar{height:56px;background:var(--navy);border-bottom:2px solid var(--gold);display:flex;align-items:center;padding:0 14px;gap:10px;color:#fff}
+.topbar .stats{margin-right:auto;display:flex;gap:8px}
+.stat{background:rgba(255,255,255,.1);padding:5px 10px;border-radius:8px;font-size:12px}
+.stat b{color:var(--gold-light)}
+.main{display:flex;flex:1;overflow:hidden;position:relative}
+#map{flex:1}
+.sidebar{width:340px;background:#fff;border-right:1px solid var(--cream-dark);display:flex;flex-direction:column}
+.tabs{display:flex;background:var(--cream);border-bottom:1px solid var(--cream-dark)}
+.tab{flex:1;padding:10px;text-align:center;font-size:12px;font-weight:700;cursor:pointer;color:#888;border-bottom:2px solid transparent}
+.tab.active{color:var(--navy);border-color:var(--gold);background:#fff}
+.content{flex:1;overflow-y:auto;padding:12px}
+.task{background:var(--cream);border:1px solid var(--cream-dark);border-right:4px solid var(--navy);border-radius:8px;padding:10px;margin-bottom:8px}
+.task b{font-size:13px;display:block;margin-bottom:4px} .task small{color:#888;font-size:11px}
+.btn{width:100%;padding:8px;border:none;border-radius:8px;font-family:'Cairo';font-weight:700;font-size:12px;cursor:pointer;margin-top:6px}
+.btn-go{background:var(--green);color:#fff} .btn-take{background:var(--navy);color:#fff}
+#toastWrap{position:fixed;top:70px;left:14px;z-index:99;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:#0F2A3D;color:#fff;padding:10px 14px;border-radius:8px;font-size:12px;border-right:4px solid var(--gold);box-shadow:0 4px 15px rgba(0,0,0,.2)}
+#panel{position:absolute;bottom:14px;right:14px;left:354px;background:#fff;border-radius:12px;padding:14px;box-shadow:0 8px 20px rgba(0,0,0,.2);z-index:20;display:none;max-width:400px}
+#panel.show{display:block}
+@media(max-width:700px){.sidebar{position:absolute;inset:0;z-index:30;display:none;width:100%}.sidebar.open{display:flex}#panel{left:14px}}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="startScreen" class="screen">
+<h1>بلدية المستقبل</h1><div class="sub">محافظة مسقط</div>
+<p class="pitch">الخريطة كانت فاضية، الحين مليانة بلاغات حقيقية من <b style="color:var(--gold-light)">مسقط</b>. اختر دورك وابدأ.</p>
+<div class="role-grid" id="roleGrid"></div>
+<button id="startBtn" class="start-btn" disabled>ابدأ المهمة 🚀</button>
+</div>
+
+<div id="gameScreen" class="screen hidden">
+<div class="topbar">
+<b>بلدية مسقط</b> <span id="roleName" style="background:rgba(200,150,30,.2);border:1px solid var(--gold);color:var(--gold-light);padding:3px 10px;border-radius:20px;font-size:11px">-</span>
+<div class="stats">
+<div class="stat">💰 <b id="b1">50,000</b></div>
+<div class="stat">⭐ <b id="r1">75%</b></div>
+<div class="stat">📋 <b id="t1">0</b></div>
+</div>
+<button onclick="document.getElementById('sidebar').classList.toggle('open')" style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;width:34px;height:34px;border-radius:8px;cursor:pointer">☰</button>
+</div>
+<div class="main">
+<div id="map"></div>
+<div class="sidebar" id="sidebar">
+<div class="tabs"><div class="tab active" onclick="showTab('tasks')">المهام</div><div class="tab" onclick="showTab('log')">السجل</div></div>
+<div class="content">
+<div id="tab-tasks"><div id="tasks"></div></div>
+<div id="tab-log" class="hidden"><div id="log" style="font-size:12px;color:#666"></div></div>
+</div>
+</div>
+<div id="panel"></div>
+</div>
+</div>
+<div id="toastWrap"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const ROLES=[{id:'mayor',name:'رئيس البلدية',icon:'🏛️'},{id:'eng',name:'مهندس',icon:'👷'},{id:'insp',name:'مفتش',icon:'🔍'},{id:'env',name:'بيئة',icon:'🌿'}];
+const AREAS=[
+{name:"روي",lat:23.587,lng:58.545,issues:["حفرة خطيرة","إنارة معطلة","نفايات متراكمة"]},
+{name:"الخوير",lat:23.585,lng:58.42,issues:["ازدحام حفريات","تصريح بناء"]},
+{name:"القرم",lat:23.62,lng:58.48,issues:["حديقة تحتاج صيانة","كسر أنبوب ماء"]},
+{name:"السيب",lat:23.67,lng:58.19,issues:["تجمع مياه أمطار","بناء مخالف"]},
+{name:"بوشر",lat:23.56,lng:58.38,issues:["رصيف مكسر","كلاب ضالة"]},
+{name:"مطرح",lat:23.615,lng:58.565,issues:["تنظيم سوق مطرح","كورنيش يحتاج تنظيف"]}
+];
+let sel=null,budget=50000,rep=75,tasks=[],map;
+
+const grid=document.getElementById('roleGrid');
+ROLES.forEach(r=>{
+let d=document.createElement('div');d.className='role-card';d.innerHTML=`<b>${r.icon} ${r.name}</b><span>اضغط للاختيار</span>`;
+d.onclick=()=>{document.querySelectorAll('.role-card').forEach(x=>x.classList.remove('selected'));d.classList.add('selected');sel=r;document.getElementById('startBtn').disabled=false};
+grid.appendChild(d);
+});
+
+document.getElementById('startBtn').onclick=()=>{
+document.getElementById('startScreen').classList.add('hidden');
+document.getElementById('gameScreen').classList.remove('hidden');
+document.getElementById('roleName').innerText=sel.name;
+setTimeout(init,200);
+};
+
+function init(){
+map=L.map('map',{zoomControl:false}).setView([23.6,58.38],11);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+AREAS.forEach(a=>{
+let issue=a.issues[Math.floor(Math.random()*a.issues
